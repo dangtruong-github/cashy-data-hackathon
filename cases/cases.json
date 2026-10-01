@@ -1,0 +1,100 @@
+{
+  "_about": "Synthetic review cases. Each case points at one row of S8.synthetic_cashy_sample.csv (0-based data row). The interviewer's view, transcript, Cashy's reasoning and Cashy's answer are authored placeholders until a Cashy-like model produces them. No real household. Reasoning 'agree' = reasons to include the household, 'disagree' = reasons to exclude it.",
+  "cases": [
+    {
+      "case_id": "H-0417",
+      "s8_row": 5,
+      "interviewer_view": [
+        "Head of household is a woman caring alone for her 9-year-old son and her mother, who has diabetes. They stay in a temporary shelter that allows them one more month.",
+        "She cleans houses when someone calls. A cousin abroad occasionally sends small amounts of money. She seemed under strain but was consistent across questions. Food looks like the most pressing need."
+      ],
+      "transcript": [
+        {"t": 12, "who": "Interviewer", "text": "Can you tell me who lives with you?"},
+        {"t": 42, "text": "We are three: me, my son, he is nine, and my mother."},
+        {"t": 75, "text": "My mother has diabetes. We can't always buy her insulin."},
+        {"t": 108, "who": "Interviewer", "text": "Does anyone in the household work?"},
+        {"t": 115, "text": "I clean houses when someone calls me, maybe two days a week."},
+        {"t": 123, "text": "The shelter lets us stay one more month. After that we don't know."},
+        {"t": 167, "text": "Some days we skip dinner so my son can eat."},
+        {"t": 210, "text": "My cousin sometimes sends a little money from the north."},
+        {"t": 245, "text": "I can't read well. My mother helps me with the forms."},
+        {"t": 280, "who": "Interviewer", "text": "Do you have your identity documents?"},
+        {"t": 288, "text": "Yes, all three of us have our papers."},
+        {"t": 310, "text": "Last month I sold my phone to pay for her medicine."},
+        {"t": 352, "who": "Interviewer", "text": "Is there anything else you want us to know?"},
+        {"t": 365, "text": "Only that my son needs to go back to school."}
+      ],
+      "reasoning": {
+        "agree": [
+          "The head of household is the sole carer of a 9-year-old child and of her mother, who has a chronic illness that the family cannot always pay to treat (01:15).",
+          "Housing is temporary. The shelter stay ends next month and there is no plan after that (02:03).",
+          "Basic needs are not met. She skips dinner so her son can eat (02:47) and sold her phone to pay for medicine (05:10), both negative coping mechanisms.",
+          "One adult cannot read well, which limits access to work and services (04:05)."
+        ],
+        "disagree": [
+          "The household receives regular income from a relative abroad (03:30).",
+          "Basic needs are partially covered.",
+          "An adult has paid work, about two days a week (01:55).",
+          "Documents are complete and an adult speaks Spanish, which eases access to work (04:48)."
+        ]
+      },
+      "cashy": {
+        "recommendation": "EXCLUDE",
+        "score": 40.6,
+        "category": "Elevada (high)",
+        "certainty_level": 1,
+        "certainty_text": "Low. Of past households like this one, about 5 in 10 were included."
+      },
+      "demo_autofill": {
+        "decision": "INCLUDE",
+        "answers": {"EC1": 2, "EC2": "Disagree", "EC3": ["Inaccurate or incorrect information", "Not appropriate or unexpected result"], "EC4": "Yes", "EC5": 2, "EC6": 4, "EC7": 2},
+        "second": "Accept"
+      }
+    },
+    {
+      "case_id": "H-0732",
+      "s8_row": 3,
+      "interviewer_view": [
+        "Single adult, 61 years old, travelling alone with no relatives in the country. Rents a shared room and earns from street sales, which currently cover rent and food.",
+        "Cannot read or write. Calm and consistent. Needs look covered for now, but the income is irregular and the respondent borrowed to pay rent last month."
+      ],
+      "transcript": [
+        {"t": 10, "who": "Interviewer", "text": "Who is travelling with you?"},
+        {"t": 18, "text": "Nobody. I came alone. I am sixty-one."},
+        {"t": 55, "text": "I rent a room that I share with two other people. It is paid until the end of next month."},
+        {"t": 100, "who": "Interviewer", "text": "Are you able to eat every day?"},
+        {"t": 106, "text": "Yes. On weekdays I have lunch at the community kitchen."},
+        {"t": 150, "text": "I sell sweets on the street most days. It pays the rent and the food."},
+        {"t": 192, "text": "Last month I borrowed from a neighbour to pay the rent on time."},
+        {"t": 238, "text": "I cannot read or write. Could you read me the form?"},
+        {"t": 280, "who": "Interviewer", "text": "Do you have your documents?"},
+        {"t": 286, "text": "Yes, I have my papers. I am healthy, thank God."}
+      ],
+      "reasoning": {
+        "agree": [
+          "An older adult travelling alone, with no support network in the country (00:18).",
+          "Cannot read or write, which limits access to services and formal work (03:58).",
+          "Has started borrowing to cover rent, a sign that the income is not always enough (03:12)."
+        ],
+        "disagree": [
+          "Basic needs are met. The respondent eats every day, with lunch at a community kitchen on weekdays (01:46).",
+          "Street sales cover rent and food (02:30).",
+          "Housing is secured until the end of next month in a rented room (00:55).",
+          "No health conditions or specific needs are reported (04:46)."
+        ]
+      },
+      "cashy": {
+        "recommendation": "EXCLUDE",
+        "score": 19.5,
+        "category": "Baja (low)",
+        "certainty_level": 3,
+        "certainty_text": "High. Of past households like this one, about 1 in 10 were included."
+      },
+      "demo_autofill": {
+        "decision": "EXCLUDE",
+        "answers": {"EC1": 4, "EC2": "Agree", "EC3": [], "EC4": null, "EC5": 4, "EC6": 4, "EC7": 4},
+        "second": "Accept"
+      }
+    }
+  ]
+}

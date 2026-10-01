@@ -1,0 +1,222 @@
+<div class="demo-strip" id="demoStrip" hidden>
+  <div class="wrap">
+    <span class="lbl">Prototype · jump to page</span>
+    <nav class="demo-tabs" aria-label="Prototype pages">
+      <button type="button" data-jump="start">S0 · Start</button>
+      <button type="button" data-jump="review">S1 · Review</button>
+      <button type="button" data-jump="rate">S2a · Reveal &amp; rate</button>
+      <button type="button" data-jump="compare">S2b · Compare</button>
+      <button type="button" data-jump="post">S3 · Post-session</button>
+    </nav>
+    <span class="spacer"></span>
+    <button type="button" class="logbtn" id="openLog" hidden>Researcher log</button>
+  </div>
+</div>
+
+<header class="topbar">
+  <div class="wrap">
+    <div class="brand">
+      <svg viewBox="0 0 128 128" role="img" aria-label="Cashy"><rect width="128" height="128" rx="28" fill="#0A5EA5"/><path d="M92 46 A34 34 0 1 0 92 82" fill="none" stroke="#F4F7FA" stroke-width="14" stroke-linecap="round"/><path d="M66 66 L78 78 L104 50" fill="none" stroke="#F4F7FA" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Cashy · Case review
+    </div>
+    <div class="meta" id="meta"></div>
+    <div class="stepper" id="stepper" aria-label="Progress">
+      <span data-step="1">1 Review</span><i></i><span data-step="2">2 Rate</span><i></i><span data-step="3">3 Compare</span>
+    </div>
+    <span class="chip" id="caseChip">Not started</span>
+  </div>
+</header>
+
+<div class="wrap"><div class="error" id="errBox" role="alert" hidden></div></div>
+
+<!-- ============ S0 · START ============ -->
+<main id="pStart" class="wrap content" hidden>
+  <div class="narrow">
+    <section class="card">
+      <div class="card-title"><span>Start a review session</span></div>
+      <p class="lead">You will review a set of households one by one. For each one, read the record, the interviewer's view, the transcript and Cashy's reasoning on both sides, then make your own decision. Cashy's recommendation appears after you decide.</p>
+      <form id="startForm" class="start-form">
+        <label for="pcode" class="q">Participant code</label>
+        <div class="start-row">
+          <input id="pcode" name="pcode" autocomplete="off" placeholder="e.g. P-07" required pattern="[A-Za-z0-9_\-]{2,16}">
+          <button type="submit" class="btn primary">Start session →</button>
+        </div>
+        <span class="prefill">Use the code from your briefing. Do not enter your name.</span>
+      </form>
+    </section>
+  </div>
+</main>
+
+<!-- ============ S1 · REVIEW ============ -->
+<main id="pReview" class="wrap content" hidden>
+  <div class="row-label">Household record</div>
+  <section class="row r-1a">
+    <article class="card">
+      <div class="card-title"><span><span class="key">A</span> · Household</span></div>
+      <div class="fields" id="cardA"></div>
+    </article>
+    <article class="card">
+      <div class="card-title"><span><span class="key">C</span> · Administrative checks</span></div>
+      <div id="cardC"></div>
+      <div class="note">A <b>−500</b> flag excludes a household whatever its score. When present it is listed first, in red.</div>
+    </article>
+  </section>
+
+  <section class="row r-1b">
+    <article class="card">
+      <div class="card-title"><span><span class="key">B</span> · Scorecard factors</span><span class="hint">Each bar shows the factor's own levels · higher = more vulnerable</span></div>
+      <div class="factors">
+        <div><h4>Demographics</h4><div id="factorsDemo"></div></div>
+        <div><h4>Needs &amp; coping</h4><div id="factorsNeeds"></div></div>
+      </div>
+    </article>
+    <article class="card">
+      <div class="card-title"><span><span class="key">D</span> · Scorecard totals</span></div>
+      <div id="cardD"></div>
+    </article>
+  </section>
+
+  <div class="row-label">Interview and Cashy's reasoning</div>
+  <section class="row r-3">
+    <article class="card">
+      <div class="card-title"><span>Interviewer's view</span><span class="chip synthetic">Synthetic</span></div>
+      <div class="col-body prose" id="viewText"></div>
+    </article>
+    <article class="card">
+      <div class="card-title"><span>Transcript</span><span class="chip synthetic">Synthetic</span></div>
+      <label class="search"><svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="m16 16 4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><input id="tSearch" type="search" placeholder="Search transcript" aria-label="Search transcript"></label>
+      <div class="col-body"><div class="lines" id="tLines"></div></div>
+    </article>
+    <article class="card">
+      <div class="card-title"><span>Reasoning</span></div>
+      <div class="tabs" role="tablist" aria-label="Cashy's reasoning">
+        <button type="button" role="tab" id="tab-agree" data-tab="agree" title="Reasons to include this household" aria-selected="false" aria-controls="reasoningText">Agree</button>
+        <button type="button" role="tab" id="tab-disagree" data-tab="disagree" title="Reasons to exclude this household" aria-selected="false" aria-controls="reasoningText">Disagree</button>
+      </div>
+      <div class="col-body prose" id="reasoningText" role="tabpanel"></div>
+    </article>
+  </section>
+
+  <section class="card decide">
+    <div class="card-title center"><span>Your decision for this household</span></div>
+    <div class="btns">
+      <button type="button" class="btn secondary wide" id="decInclude" disabled>Include this household</button>
+      <button type="button" class="btn secondary wide" id="decExclude" disabled>Exclude this household</button>
+    </div>
+    <div class="prefill" id="decideHint">Cashy's recommendation appears after you decide. Your decision is logged first.</div>
+    <button type="button" class="btn ghost" id="backBtn" hidden>Back to step 2 →</button>
+  </section>
+</main>
+
+<!-- ============ S2a · REVEAL & RATE ============ -->
+<main id="pRate" class="wrap content" hidden>
+  <div class="narrow">
+    <section class="card">
+      <div class="card-title"><span>Cashy's recommendation</span><span class="chip">Shown after your decision</span></div>
+      <div class="answer">
+        <div class="badge" id="rvBadge">EXCLUDE</div>
+        <dl>
+          <dt>Cashy score</dt><dd class="mono" id="rvScore"></dd>
+          <dt>Category</dt><dd id="rvCat"></dd>
+          <dt>Certainty</dt><dd><span class="certainty" id="rvCertBars" aria-hidden="true"><i></i><i></i><i></i></span><span id="rvCert"></span></dd>
+        </dl>
+      </div>
+      <div class="warn" id="rvWarn">
+        <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5 15 14H1z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M8 6v3.5M8 11.5v.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+        <span id="rvWarnTxt"></span>
+      </div>
+      <div class="recap-items">
+        <span>Your decision: <b id="rcOwn"></b></span>
+        <button type="button" class="btn ghost" id="viewCase">View case again ↗</button>
+      </div>
+    </section>
+
+    <section class="card qs" id="qs">
+      <div class="card-title"><span>About Cashy's recommendation for this case</span><span class="chip" id="lockChip">7 items · Annex II</span></div>
+    </section>
+
+    <section class="foot">
+      <span class="prefill" id="submitHint"></span>
+      <button type="button" class="btn primary" id="submitBtn" disabled>Submit &amp; compare →</button>
+    </section>
+  </div>
+</main>
+
+<!-- ============ S2b · COMPARE ============ -->
+<main id="pCompare" class="wrap content" hidden>
+  <div class="narrow">
+    <section class="card">
+      <div class="card-title"><span>Three calls, side by side</span></div>
+      <div class="calls">
+        <div class="call"><span class="who">You</span><span class="val" id="cmpOwn"></span><span class="muted">Logged before Cashy was shown</span></div>
+        <div class="call"><span class="who">Cashy</span><span class="val" id="cmpCashy"></span><span class="muted" id="cmpCashySub"></span></div>
+        <div class="call ref"><span class="who">Operation's recorded determination</span><span class="val" id="cmpRef"></span><span class="muted" id="cmpRefSub"></span></div>
+      </div>
+      <div class="muted" id="cmpFinal"></div>
+      <div class="banner">
+        <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M8 7v4.5M8 4.5v.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+        <span>"Correct" here means matching the operation's own recorded determination, the standard you are accountable to. It is not the truth about this household's need.</span>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-title"><span>Your decision on the recorded determination</span></div>
+      <div class="seg center" id="secondSeg">
+        <button type="button" class="btn secondary wide" data-v="Accept" aria-pressed="false">Accept the determination</button>
+        <button type="button" class="btn secondary wide" data-v="Override" aria-pressed="false">Override the determination</button>
+      </div>
+      <div id="reasonWrap" class="item" hidden>
+        <label for="secReason" class="q">Why are you overriding? (optional, one or two lines)</label>
+        <textarea id="secReason" maxlength="500" placeholder="For example: field knowledge not in the record"></textarea>
+      </div>
+    </section>
+
+    <section class="foot">
+      <span class="prefill" id="nextHint"></span>
+      <button type="button" class="btn primary" id="nextBtn" disabled>Next household →</button>
+    </section>
+  </div>
+</main>
+
+<!-- ============ S3 · POST-SESSION ============ -->
+<main id="pPost" class="wrap content" hidden>
+  <div class="narrow">
+    <section class="card">
+      <div class="card-title"><span id="postTitle">Session complete</span><span class="chip">Once per session</span></div>
+      <p class="lead">Before you finish, rate Cashy-AI against the five UN principles for the ethical use of AI. There are no right answers. Think about the households you just reviewed.</p>
+      <div class="fields"><div class="field"><span class="k">Participant code</span><span class="v mono" id="postCode"></span></div></div>
+      <div class="note">Your answers are linked to your assessments by this code. In the original study, forms were matched by a name each participant chose. A code keeps caseworkers from being identifiable.</div>
+    </section>
+
+    <section class="card qs" id="principles">
+      <div class="card-title"><span>Five UN AI principles</span><span class="chip" id="prChip">5 items · Annex II 2c</span></div>
+    </section>
+
+    <section class="card">
+      <label class="q" for="prComment">Please send your general comments <span class="req">*</span></label>
+      <textarea id="prComment" maxlength="2000" placeholder="Required"></textarea>
+    </section>
+
+    <section class="foot">
+      <span class="prefill" id="prHint"></span>
+      <button type="button" class="btn primary" id="prSubmit" disabled>Finish session</button>
+    </section>
+    <div class="done-panel" id="prDone" hidden>
+      <span><b>Session finished.</b> Thank you. Your ratings are saved with your assessments.</span>
+      <button type="button" class="btn ghost" id="restart">Start a new session</button>
+    </div>
+  </div>
+</main>
+
+<!-- ============ RESEARCHER LOG ============ -->
+<aside class="drawer" id="drawer" hidden aria-label="Researcher log">
+  <header>
+    <div><h3>Researcher log</h3><div class="muted small">Recorded silently. Never shown to caseworkers.</div></div>
+    <button type="button" class="btn ghost" id="closeLog">Close</button>
+  </header>
+  <div class="dbody">
+    <div class="metrics" id="metrics"></div>
+    <div><div class="sect">Events</div><ul class="events" id="events"></ul></div>
+    <div><div class="sect">Assessment record</div><pre class="rec" id="rec"></pre></div>
+  </div>
+</aside>
