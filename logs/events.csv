@@ -1,2 +1,0 @@
-timestamp_utc,session_id,participant,case_id,client_ms,event,data
-2026-10-01T15:58:10+00:00,HqyDihpqhEbwH4dh,P-07,H-0417,7,case_opened,"{""case_id"": ""H-0417"", ""first_tab"": ""agree""}"

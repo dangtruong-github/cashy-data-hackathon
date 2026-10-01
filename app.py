@@ -24,7 +24,7 @@ import protocol as P
 import s8
 
 BASE = Path(__file__).resolve().parent
-S8_PATH = Path(os.environ.get("CASHY_S8_PATH", BASE.parent / "S8.synthetic_cashy_sample.csv"))
+S8_PATH = Path(os.environ.get("CASHY_S8_PATH", BASE / "S8.synthetic_cashy_sample.csv"))
 CASES_PATH = Path(os.environ.get("CASHY_CASES_PATH", BASE / "cases" / "cases.json"))
 LOG_DIR = Path(os.environ.get("CASHY_LOG_DIR", BASE / "logs"))
 VARIANT = os.environ.get("CASHY_VARIANT", "second_look_reasoning_first")
