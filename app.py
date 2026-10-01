@@ -30,7 +30,38 @@ LOG_DIR = Path(os.environ.get("CASHY_LOG_DIR", BASE / "logs"))
 VARIANT = os.environ.get("CASHY_VARIANT", "second_look_reasoning_first")
 
 ROWS = s8.load_rows(S8_PATH)
-CASES = json.loads(CASES_PATH.read_text(encoding="utf-8"))["cases"]
+
+
+def expand_cases(cases: list[dict], rows: list[dict], target: int = 20) -> list[dict]:
+    """Pad the prototype to a realistic review workload using unique S8 rows from the synthetic dataset."""
+    if not cases:
+        return []
+    expanded = list(cases[:target])
+    used_rows = {int(c["s8_row"]) for c in expanded if "s8_row" in c and isinstance(c.get("s8_row"), int)}
+    if len(expanded) >= target:
+        return expanded
+
+    seed = expanded[0]
+    for offset in range(len(rows)):
+        row_index = (offset * 37 + 13) % len(rows)
+        if row_index in used_rows:
+            continue
+        clone = json.loads(json.dumps(seed))
+        clone["case_id"] = f"H-{row_index:04d}"
+        clone["s8_row"] = row_index
+        clone["demo_autofill"] = {
+            "decision": "INCLUDE" if row_index % 2 == 0 else "EXCLUDE",
+            "answers": {"EC1": 3, "EC2": "Agree" if row_index % 2 == 0 else "Disagree", "EC3": [], "EC4": None, "EC5": 3, "EC6": 3, "EC7": 3},
+            "second": "Accept"
+        }
+        expanded.append(clone)
+        used_rows.add(row_index)
+        if len(expanded) >= target:
+            break
+    return expanded[:target]
+
+
+CASES = expand_cases(json.loads(CASES_PATH.read_text(encoding="utf-8"))["cases"], ROWS, target=20)
 s8.validate_cases(CASES, ROWS)
 
 app = Flask(__name__, static_folder="static", static_url_path="/static")

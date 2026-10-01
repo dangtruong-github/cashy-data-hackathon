@@ -7,6 +7,7 @@
   const DEMO = window.CASHY_DEMO || null;
   const params = new URLSearchParams(location.search);
   const RESEARCH = !!DEMO || params.has("research");
+  const DEFAULT_PARTICIPANT = "P-07";
   const $ = (id) => document.getElementById(id);
 
   function h(tag, props, ...kids) {
@@ -170,40 +171,65 @@
   /* ---------- Build: case ---------- */
   function buildCase() {
     const k = S.kase;
-    $("cardA").replaceChildren(...k.household.map((f) =>
-      h("div", { class: "field" }, h("span", { class: "k", text: f.label }),
-        h("span", { class: "v" + (f.na ? " na" : "") }, f.value, f.note ? h("small", null, " " + f.note) : null))));
-    $("cardC").replaceChildren(...k.admin.map((f) =>
-      h("div", { class: "flag" }, h("span", { text: f.label }), h("span", { class: "chip " + f.tone, text: f.chip }))));
+    const cardA = $("cardA");
+    if (cardA && Array.isArray(k.household)) {
+      cardA.replaceChildren(...k.household.map((f) =>
+        h("div", { class: "field" }, h("span", { class: "k", text: f.label }),
+          h("span", { class: "v" + (f.na ? " na" : "") }, f.value, f.note ? h("small", null, " " + f.note) : null))));
+    }
+
+    const cardC = $("cardC");
+    if (cardC && Array.isArray(k.admin)) {
+      cardC.replaceChildren(...k.admin.map((f) =>
+        h("div", { class: "flag" }, h("span", { text: f.label }), h("span", { class: "chip " + f.tone, text: f.chip }))));
+    }
+
     const factorRow = (f) => h("div", { class: "factor" },
       h("span", { text: f.name }), h("span", { class: "mono", text: f.value.toFixed(2) }),
       h("span", { class: "bar" }, Array.from({ length: f.levels }, (_, i) => h("i", { class: i <= f.level ? "on" : null })),
         f.max ? h("span", { class: "max", text: "MAX" }) : null));
-    $("factorsDemo").replaceChildren(...k.factors.filter((f) => f.group === "demographics").map(factorRow));
-    $("factorsNeeds").replaceChildren(...k.factors.filter((f) => f.group === "needs").map(factorRow));
-    const t = k.totals;
-    $("cardD").replaceChildren(
-      h("div", { class: "fields" },
-        h("div", { class: "field" }, h("span", { class: "k", text: "Demographics" }), h("span", { class: "v mono", text: t.demographics.toFixed(1) })),
-        h("div", { class: "field" }, h("span", { class: "k", text: "Needs & coping" }), h("span", { class: "v mono", text: "+ " + t.needs.toFixed(1) }))),
-      h("hr", { class: "div" }),
-      h("div", { class: "total" }, h("span", { class: "muted", text: "FinalScore" }),
-        h("span", { class: "big" }, t.final.toFixed(1) + " ", h("small", { text: "/ " + t.final_max }))),
-      h("div", { class: "fields" },
-        h("div", { class: "field" }, h("span", { class: "k" }, "Vulnerability_Score ", h("small", { class: "muted", text: "(index)" })), h("span", { class: "v mono", text: t.vulnerability_score.toFixed(2) })),
-        h("div", { class: "field" }, h("span", { class: "k", text: "Band" }), h("span", { class: "v" }, h("span", { class: "chip primary", text: t.band })))));
 
-    $("viewText").replaceChildren(...k.interviewer_view.map((t) => h("p", { text: t })));
-    $("tSearch").value = "";
-    $("tLines").replaceChildren(...k.transcript.map((L) => h("div", { class: "tline" },
+    const factorsDemo = $("factorsDemo");
+    if (factorsDemo && Array.isArray(k.factors)) {
+      factorsDemo.replaceChildren(...k.factors.filter((f) => f.group === "demographics").map(factorRow));
+    }
+    const factorsNeeds = $("factorsNeeds");
+    if (factorsNeeds && Array.isArray(k.factors)) {
+      factorsNeeds.replaceChildren(...k.factors.filter((f) => f.group === "needs").map(factorRow));
+    }
+
+    const cardD = $("cardD");
+    if (cardD && k.totals) {
+      const t = k.totals;
+      cardD.replaceChildren(
+        h("div", { class: "fields" },
+          h("div", { class: "field" }, h("span", { class: "k", text: "Demographics" }), h("span", { class: "v mono", text: t.demographics.toFixed(1) })),
+          h("div", { class: "field" }, h("span", { class: "k", text: "Needs & coping" }), h("span", { class: "v mono", text: "+ " + t.needs.toFixed(1) }))),
+        h("hr", { class: "div" }),
+        h("div", { class: "total" }, h("span", { class: "muted", text: "FinalScore" }),
+          h("span", { class: "big" }, t.final.toFixed(1) + " ", h("small", { text: "/ " + t.final_max }))),
+        h("div", { class: "fields" },
+          h("div", { class: "field" }, h("span", { class: "k" }, "Vulnerability_Score ", h("small", { class: "muted", text: "(index)" })), h("span", { class: "v mono", text: t.vulnerability_score.toFixed(2) })),
+          h("div", { class: "field" }, h("span", { class: "k", text: "Band" }), h("span", { class: "v" }, h("span", { class: "chip primary", text: t.band })))));
+    }
+
+    const viewText = $("viewText");
+    if (viewText) viewText.replaceChildren(...k.interviewer_view.map((t) => h("p", { text: t })));
+    const tSearch = $("tSearch");
+    if (tSearch) tSearch.value = "";
+    const tLines = $("tLines");
+    if (tLines) tLines.replaceChildren(...k.transcript.map((L) => h("div", { class: "tline" },
       h("span", { class: "mono", text: fmtSec(L.t) }),
       h("span", null, L.who ? h("span", { class: "who", text: L.who + ": " }) : null, L.text))));
     showTab(S.tab);
   }
   function showTab(tab) {
     document.querySelectorAll("[data-tab]").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.tab === tab)));
-    $("reasoningText").replaceChildren(...S.kase.reasoning[tab].map((t) => h("p", { text: t })));
-    $("reasoningText").scrollTop = 0;
+    const reasoningText = $("reasoningText");
+    if (!reasoningText || !S.kase || !S.kase.reasoning || !S.kase.reasoning[tab]) return;
+    const list = h("ul", { class: "reasoning-list" }, ...S.kase.reasoning[tab].map((t) => h("li", { text: t })));
+    reasoningText.replaceChildren(list);
+    reasoningText.scrollTop = 0;
   }
 
   /* ---------- Build: items and principles (once) ---------- */
@@ -244,7 +270,7 @@
   }
 
   /* ---------- Render ---------- */
-  const PAGES = { start: "pStart", review: "pReview", rate: "pRate", compare: "pCompare", post: "pPost" };
+  const PAGES = { review: "pReview", rate: "pRate", compare: "pCompare", post: "pPost" };
   function render() {
     const p = S.page;
     for (const [k, id] of Object.entries(PAGES)) $(id).hidden = p !== k;
@@ -260,11 +286,14 @@
     });
     const meta = $("meta");
     if (S.kase && step >= 1 && step <= 3) {
-      meta.replaceChildren(h("span", null, "Household ", h("b", { text: S.kase.case_id })), h("span", { class: "chip synthetic", text: "Synthetic" }),
-        h("span", null, "Office ", h("b", { text: S.kase.meta.office })), h("span", null, "Interview ", h("b", { text: S.kase.meta.month })));
+      meta.replaceChildren(
+        h("span", null, "Case ", h("b", { text: S.kase.case_id })),
+        h("span", null, "Office ", h("b", { text: S.kase.meta.office })),
+        h("span", null, "Interview ", h("b", { text: S.kase.meta.month }))
+      );
     } else meta.replaceChildren(h("span", { text: p === "post" ? "Post-session questionnaire" : "Review session" }));
     $("caseChip").textContent = S.participant
-      ? `Caseworker ${S.participant}` + (p === "post" ? " · Session complete" : ` · Case ${S.idx + 1} / ${S.total}`)
+      ? (p === "post" ? "Session complete" : `Case ${S.idx + 1} / ${S.total}`)
       : "Not started";
 
     // S1
@@ -369,8 +398,8 @@
   /* ---------- Demo jumps (prototype only) ---------- */
   async function jump(target) {
     const auto = () => DEMO.cases[S.idx].autofill;
-    if (target === "start") { S = fresh(); S.page = "start"; $("pcode").value = "P-07"; return; }
-    if (target === "review" || !S.session) { S = fresh(); await startSession("P-07"); if (target === "review") return; }
+    if (target === "start") { S = fresh(); S.page = "review"; await startSession(DEFAULT_PARTICIPANT); return; }
+    if (target === "review" || !S.session) { S = fresh(); await startSession(DEFAULT_PARTICIPANT); if (target === "review") return; }
     if (target === "post") { S.page = "post"; log("demo_jump", { to: "post" }); return; }
     if (S.page === "review" && !S.decision) await decide(auto().decision);
     if (target === "rate") { S.page = "rate"; return; }
@@ -383,7 +412,6 @@
   }
 
   /* ---------- Wire ---------- */
-  $("startForm").addEventListener("submit", (e) => { e.preventDefault(); const code = $("pcode").value.trim(); run(() => startSession(code)); });
   $("decInclude").addEventListener("click", () => run(() => decide("INCLUDE")));
   $("decExclude").addEventListener("click", () => run(() => decide("EXCLUDE")));
   $("viewCase").addEventListener("click", () => { log("viewed_case_again"); S.page = "review"; render(); window.scrollTo(0, 0); });
@@ -398,10 +426,12 @@
     showTab(tab);
     log("reasoning_tab", { tab });
   }));
-  $("tSearch").addEventListener("input", (e) => {
-    const q = e.target.value.trim().toLowerCase();
-    document.querySelectorAll("#tLines .tline").forEach((l) => { l.hidden = !!q && !l.textContent.toLowerCase().includes(q); });
-  });
+  if ($("tSearch")) {
+    $("tSearch").addEventListener("input", (e) => {
+      const q = e.target.value.trim().toLowerCase();
+      document.querySelectorAll("#tLines .tline").forEach((l) => { l.hidden = !!q && !l.textContent.toLowerCase().includes(q); });
+    });
+  }
   $("nextBtn").addEventListener("click", () => run(next));
   $("prComment").addEventListener("input", (e) => { S.comment = e.target.value; render(); });
   $("prSubmit").addEventListener("click", () => run(finish));
@@ -413,11 +443,12 @@
   $("backBtn").addEventListener("click", () => { S.page = S.submitted ? "compare" : "rate"; render(); window.scrollTo(0, 0); });
 
   S = fresh();
+  S.page = "review";
   buildItems();
   buildPrinciples();
   $("demoStrip").hidden = !DEMO && !RESEARCH;
   document.querySelector(".demo-tabs").hidden = !DEMO;
   $("openLog").hidden = !RESEARCH;
-  if (DEMO) run(() => startSession("P-07"));
-  else render();
+  if (DEMO) run(() => startSession(DEFAULT_PARTICIPANT));
+  else run(() => startSession(DEFAULT_PARTICIPANT));
 })();

@@ -17,7 +17,7 @@
   <div class="wrap">
     <div class="brand">
       <svg viewBox="0 0 128 128" role="img" aria-label="Cashy"><rect width="128" height="128" rx="28" fill="#0A5EA5"/><path d="M92 46 A34 34 0 1 0 92 82" fill="none" stroke="#F4F7FA" stroke-width="14" stroke-linecap="round"/><path d="M66 66 L78 78 L104 50" fill="none" stroke="#F4F7FA" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      Cashy · Case review
+      Cashy · Review
     </div>
     <div class="meta" id="meta"></div>
     <div class="stepper" id="stepper" aria-label="Progress">
@@ -29,36 +29,13 @@
 
 <div class="wrap"><div class="error" id="errBox" role="alert" hidden></div></div>
 
-<!-- ============ S0 · START ============ -->
-<main id="pStart" class="wrap content" hidden>
-  <div class="narrow">
-    <section class="card">
-      <div class="card-title"><span>Start a review session</span></div>
-      <p class="lead">You will review a set of households one by one. For each one, read the record, the interviewer's view, the transcript and Cashy's reasoning on both sides, then make your own decision. Cashy's recommendation appears after you decide.</p>
-      <form id="startForm" class="start-form">
-        <label for="pcode" class="q">Participant code</label>
-        <div class="start-row">
-          <input id="pcode" name="pcode" autocomplete="off" placeholder="e.g. P-07" required pattern="[A-Za-z0-9_\-]{2,16}">
-          <button type="submit" class="btn primary">Start session →</button>
-        </div>
-        <span class="prefill">Use the code from your briefing. Do not enter your name.</span>
-      </form>
-    </section>
-  </div>
-</main>
-
 <!-- ============ S1 · REVIEW ============ -->
 <main id="pReview" class="wrap content" hidden>
   <div class="row-label">Household record</div>
   <section class="row r-1a">
-    <article class="card">
+    <article class="card summary-card">
       <div class="card-title"><span><span class="key">A</span> · Household</span></div>
       <div class="fields" id="cardA"></div>
-    </article>
-    <article class="card">
-      <div class="card-title"><span><span class="key">C</span> · Administrative checks</span></div>
-      <div id="cardC"></div>
-      <div class="note">A <b>−500</b> flag excludes a household whatever its score. When present it is listed first, in red.</div>
     </article>
   </section>
 
@@ -76,17 +53,8 @@
     </article>
   </section>
 
-  <div class="row-label">Interview and Cashy's reasoning</div>
+  <div class="row-label">Cashy's reasoning</div>
   <section class="row r-3">
-    <article class="card">
-      <div class="card-title"><span>Interviewer's view</span><span class="chip synthetic">Synthetic</span></div>
-      <div class="col-body prose" id="viewText"></div>
-    </article>
-    <article class="card">
-      <div class="card-title"><span>Transcript</span><span class="chip synthetic">Synthetic</span></div>
-      <label class="search"><svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="m16 16 4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><input id="tSearch" type="search" placeholder="Search transcript" aria-label="Search transcript"></label>
-      <div class="col-body"><div class="lines" id="tLines"></div></div>
-    </article>
     <article class="card">
       <div class="card-title"><span>Reasoning</span></div>
       <div class="tabs" role="tablist" aria-label="Cashy's reasoning">

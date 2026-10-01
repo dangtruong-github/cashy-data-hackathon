@@ -26,16 +26,16 @@
       ],
       "reasoning": {
         "agree": [
-          "The head of household is the sole carer of a 9-year-old child and of her mother, who has a chronic illness that the family cannot always pay to treat (01:15).",
-          "Housing is temporary. The shelter stay ends next month and there is no plan after that (02:03).",
-          "Basic needs are not met. She skips dinner so her son can eat (02:47) and sold her phone to pay for medicine (05:10), both negative coping mechanisms.",
-          "One adult cannot read well, which limits access to work and services (04:05)."
+          "The head of household is the sole carer of a 9-year-old child and her mother, who has a chronic illness and requires ongoing treatment.",
+          "The household is in a precarious housing situation, with the shelter stay ending soon and no stable accommodation after that.",
+          "Basic needs are not being met: the family is skipping meals and the mother sold personal belongings to pay for medical care.",
+          "Limited literacy and weak access to services increase the household's vulnerability and reduce its ability to cope independently."
         ],
         "disagree": [
-          "The household receives regular income from a relative abroad (03:30).",
+          "The household receives regular income from a relative abroad.",
           "Basic needs are partially covered.",
-          "An adult has paid work, about two days a week (01:55).",
-          "Documents are complete and an adult speaks Spanish, which eases access to work (04:48)."
+          "An adult has paid work, about two days a week.",
+          "Documents are complete and an adult speaks Spanish, which eases access to work."
         ]
       },
       "cashy": {
@@ -72,15 +72,15 @@
       ],
       "reasoning": {
         "agree": [
-          "An older adult travelling alone, with no support network in the country (00:18).",
-          "Cannot read or write, which limits access to services and formal work (03:58).",
-          "Has started borrowing to cover rent, a sign that the income is not always enough (03:12)."
+          "An older adult travelling alone, with no support network in the country.",
+          "Cannot read or write, which limits access to services and formal work.",
+          "Has started borrowing to cover rent, a sign that the income is not always enough."
         ],
         "disagree": [
-          "Basic needs are met. The respondent eats every day, with lunch at a community kitchen on weekdays (01:46).",
-          "Street sales cover rent and food (02:30).",
-          "Housing is secured until the end of next month in a rented room (00:55).",
-          "No health conditions or specific needs are reported (04:46)."
+          "Basic needs are met. The respondent eats every day, with lunch at a community kitchen on weekdays.",
+          "Street sales cover rent and food.",
+          "Housing is secured until the end of next month in a rented room.",
+          "No health conditions or specific needs are reported."
         ]
       },
       "cashy": {
