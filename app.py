@@ -113,6 +113,15 @@ def _api_error(e: ApiError):
     return jsonify(error=str(e)), e.status
 
 
+@app.after_request
+def _no_cache(response):
+    if request.path == "/" or request.path.startswith("/static/"):
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+    return response
+
+
 def get_session(sid: str) -> dict:
     sess = SESSIONS.get(sid)
     if not sess:

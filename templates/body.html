@@ -1,11 +1,9 @@
 <div class="demo-strip" id="demoStrip" hidden>
   <div class="wrap">
-    <span class="lbl">Prototype · jump to page</span>
-    <nav class="demo-tabs" aria-label="Prototype pages">
-      <button type="button" data-jump="review">S1 · Review</button>
-      <button type="button" data-jump="rate">S2a · Reveal &amp; rate</button>
-      <button type="button" data-jump="compare">S2b · Compare</button>
-      <button type="button" data-jump="post">S3 · Post-session</button>
+    <span class="lbl">Prototype · review flow</span>
+    <nav class="demo-tabs" aria-label="Review flow">
+      <button type="button" data-jump="review">Review</button>
+      <button type="button" data-jump="rate">Reveal &amp; rate</button>
     </nav>
     <span class="spacer"></span>
     <button type="button" class="logbtn" id="openLog" hidden>Researcher log</button>
@@ -20,7 +18,7 @@
     </div>
     <div class="meta" id="meta"></div>
     <div class="stepper" id="stepper" aria-label="Progress">
-      <span data-step="1">1 Review</span><i></i><span data-step="2">2 Rate</span><i></i><span data-step="3">3 Compare</span>
+      <span data-step="1">1 Review</span><i></i><span data-step="2">2 Rate</span>
     </div>
     <span class="chip" id="caseChip">Not started</span>
   </div>
@@ -30,15 +28,12 @@
 
 <!-- ============ S1 · REVIEW ============ -->
 <main id="pReview" class="wrap content" hidden>
-  <div class="row-label">Household record</div>
-  <section class="row r-1a">
+  <section class="row r-1ab">
     <article class="card summary-card">
       <div class="card-title"><span><span class="key">A</span> · Household</span></div>
       <div class="fields" id="cardA"></div>
     </article>
-  </section>
 
-  <section class="row r-1b">
     <article class="card">
       <div class="card-title"><span><span class="key">B</span> · Scorecard factors</span><span class="hint">Each bar shows the factor's own levels · higher = more vulnerable</span></div>
       <div class="factors">
@@ -46,16 +41,16 @@
         <div><h4>Needs &amp; coping</h4><div id="factorsNeeds"></div></div>
       </div>
     </article>
-    <article class="card">
-      <div class="card-title"><span><span class="key">D</span> · Scorecard totals</span></div>
-      <div id="cardD"></div>
-    </article>
   </section>
 
-  <div class="row-label">Cashy's reasoning</div>
-  <section class="row r-3">
+  <section class="row r-2c">
     <article class="card">
-      <div class="card-title"><span>Reasoning</span></div>
+      <div class="card-title"><span><span class="key">C</span> · Scorecard totals</span></div>
+      <div id="cardD"></div>
+    </article>
+
+    <article class="card">
+      <div class="card-title"><span>Cashy's reasoning</span></div>
       <div class="tabs" role="tablist" aria-label="Cashy's reasoning">
         <button type="button" role="tab" id="tab-agree" data-tab="agree" title="Reasons to include this household" aria-selected="false" aria-controls="reasoningText">Agree</button>
         <button type="button" role="tab" id="tab-disagree" data-tab="disagree" title="Reasons to exclude this household" aria-selected="false" aria-controls="reasoningText">Disagree</button>
@@ -102,50 +97,22 @@
       <div class="card-title"><span>About Cashy's recommendation for this case</span><span class="chip" id="lockChip">7 items · Annex II</span></div>
     </section>
 
+    <div class="solve-toast" id="rateSolved" hidden>
+      <span class="solve-icon" aria-hidden="true">✓</span>
+      <div>
+        <strong>Solved!</strong>
+        <span>Moving to the next case…</span>
+      </div>
+    </div>
+
     <section class="foot">
       <span class="prefill" id="submitHint"></span>
-      <button type="button" class="btn primary" id="submitBtn" disabled>Submit &amp; compare →</button>
+      <button type="button" class="btn primary" id="submitBtn" disabled>Submit &amp; next case →</button>
     </section>
   </div>
 </main>
 
-<!-- ============ S2b · COMPARE ============ -->
-<main id="pCompare" class="wrap content" hidden>
-  <div class="narrow">
-    <section class="card">
-      <div class="card-title"><span>Three calls, side by side</span></div>
-      <div class="calls">
-        <div class="call"><span class="who">You</span><span class="val" id="cmpOwn"></span><span class="muted">Logged before Cashy was shown</span></div>
-        <div class="call"><span class="who">Cashy</span><span class="val" id="cmpCashy"></span><span class="muted" id="cmpCashySub"></span></div>
-        <div class="call ref"><span class="who">Operation's recorded determination</span><span class="val" id="cmpRef"></span><span class="muted" id="cmpRefSub"></span></div>
-      </div>
-      <div class="muted" id="cmpFinal"></div>
-      <div class="banner">
-        <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M8 7v4.5M8 4.5v.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
-        <span>"Correct" here means matching the operation's own recorded determination, the standard you are accountable to. It is not the truth about this household's need.</span>
-      </div>
-    </section>
-
-    <section class="card">
-      <div class="card-title"><span>Your decision on the recorded determination</span></div>
-      <div class="seg center" id="secondSeg">
-        <button type="button" class="btn secondary wide" data-v="Accept" aria-pressed="false">Accept the determination</button>
-        <button type="button" class="btn secondary wide" data-v="Override" aria-pressed="false">Override the determination</button>
-      </div>
-      <div id="reasonWrap" class="item" hidden>
-        <label for="secReason" class="q">Why are you overriding? (optional, one or two lines)</label>
-        <textarea id="secReason" maxlength="500" placeholder="For example: field knowledge not in the record"></textarea>
-      </div>
-    </section>
-
-    <section class="foot">
-      <span class="prefill" id="nextHint"></span>
-      <button type="button" class="btn primary" id="nextBtn" disabled>Next household →</button>
-    </section>
-  </div>
-</main>
-
-<!-- ============ S3 · POST-SESSION ============ -->
+<!-- ============ POST-SESSION ============ -->
 <main id="pPost" class="wrap content" hidden>
   <div class="narrow">
     <section class="card">

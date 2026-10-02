@@ -94,14 +94,14 @@
   let S;
   function fresh() {
     return { page: "review", session: null, participant: null, total: 0, idx: 0, kase: null, events: [], t0: Date.now(),
-      tab: "agree", firstTab: "agree", viewed: [], decision: null, cashy: null, ec: {}, ec3: [], submitted: false, reference: null, record: null,
-      second: null, reason: "", pr: {}, comment: "", prDone: false, busy: false };
+      tab: "agree", firstTab: "agree", viewed: [], decision: null, cashy: null, ec: {}, ec3: [], submitted: false, solved: false, reference: null, record: null,
+      second: null, reason: "", pr: {}, comment: "", prDone: false, busy: false, transitionTimer: null, toastTimer: null };
   }
   function resetCase() {
     const first = Math.random() < 0.5 ? "agree" : "disagree"; // counterbalance which side is read first
     Object.assign(S, { kase: null, tab: first, firstTab: first, viewed: [first], decision: null, cashy: null, ec: {}, ec3: [], submitted: false,
-      reference: null, record: null, second: null, reason: "", t0: Date.now() });
-    $("secReason").value = "";
+      solved: false, reference: null, record: null, second: null, reason: "", t0: Date.now() });
+    if ($("secReason")) $("secReason").value = "";
   }
   function log(event, data) {
     const ms = Date.now() - S.t0;
@@ -132,6 +132,9 @@
     await loadCase(0);
   }
   async function loadCase(i) {
+    if (S.transitionTimer) clearTimeout(S.transitionTimer);
+    if (S.toastTimer) clearTimeout(S.toastTimer);
+    S.toastTimer = null;
     resetCase();
     S.idx = i;
     S.kase = await api.getCase(i);
@@ -151,14 +154,25 @@
   async function submit() {
     const a = { EC1: S.ec.EC1, EC2: S.ec.EC2, EC3: isDisagree() ? S.ec3 : [], EC4: isDisagree() ? S.ec.EC4 : null, EC5: S.ec.EC5, EC6: S.ec.EC6, EC7: S.ec.EC7 };
     const r = await api.rate(S.idx, a);
-    S.reference = r.reference; S.record = r.record; S.submitted = true;
+    S.reference = r.reference; S.record = r.record; S.submitted = true; S.solved = true;
     log("submitted", { gap: r.record.gap_ec6_minus_ec5, outcome: r.record.outcome });
-    S.page = "compare";
+    render();
     window.scrollTo(0, 0);
+
+    if (S.toastTimer) clearTimeout(S.toastTimer);
+    if (S.transitionTimer) clearTimeout(S.transitionTimer);
+    S.toastTimer = null;
+    S.transitionTimer = null;
+
+    if (S.idx + 1 < S.total) {
+      await loadCase(S.idx + 1);
+    } else {
+      S.page = "post";
+      log("post_session_opened");
+      window.scrollTo(0, 0);
+    }
   }
   async function next() {
-    await api.second(S.idx, S.second, S.reason);
-    log("second_decision", { value: S.second });
     if (S.idx + 1 < S.total) await loadCase(S.idx + 1);
     else { S.page = "post"; log("post_session_opened"); window.scrollTo(0, 0); }
   }
@@ -264,19 +278,19 @@
   }
 
   /* ---------- Render ---------- */
-  const PAGES = { review: "pReview", rate: "pRate", compare: "pCompare", post: "pPost" };
+  const PAGES = { review: "pReview", rate: "pRate", post: "pPost" };
   function render() {
     const p = S.page;
     for (const [k, id] of Object.entries(PAGES)) $(id).hidden = p !== k;
     document.querySelectorAll("[data-jump]").forEach((b) => b.setAttribute("aria-current", String(b.dataset.jump === p)));
 
     // Top bar
-    const step = { review: 1, rate: 2, compare: 3, post: 4 }[p] || 0;
+    const step = { review: 1, rate: 2, post: 2 }[p] || 0;
     $("stepper").hidden = step === 0;
     document.querySelectorAll("#stepper span").forEach((s) => {
       const n = +s.dataset.step;
       s.className = n === step ? "on" : n < step ? "done" : "";
-      s.textContent = (n < step ? "✓ " : n + " ") + ["Review", "Rate", "Compare"][n - 1];
+      s.textContent = (n < step ? "✓ " : n + " ") + ["Review", "Rate"][n - 1];
     });
     const meta = $("meta");
     if (S.kase && step >= 1 && step <= 3) {
@@ -325,28 +339,12 @@
     });
     document.querySelectorAll(".checklist input").forEach((i) => { i.checked = S.ec3.includes(i.value); i.disabled = S.submitted; });
     if ($("condBox")) $("condBox").hidden = !isDisagree();
+    const solved = !!S.solved;
     $("submitBtn").disabled = !canSubmit() || S.submitted || S.busy;
-    $("submitBtn").textContent = S.submitted ? "Submitted" : "Submit & compare →";
-    $("submitHint").textContent = S.submitted ? "Submitted and locked." : canSubmit() ? "You can't change these answers after submitting." : "Answer every item to continue.";
+    $("submitBtn").textContent = S.submitted ? "Submitted" : "Submit & next case →";
+    $("submitHint").textContent = solved ? "Case recorded. Moving to the next case…" : S.submitted ? "Submitted and locked." : canSubmit() ? "You can't change these answers after submitting." : "Answer every item to continue.";
     $("lockChip").textContent = S.submitted ? "Locked" : "7 items · Annex II";
-
-    // S2b
-    if (S.reference) {
-      $("cmpOwn").textContent = S.decision;
-      $("cmpCashy").textContent = S.cashy.recommendation;
-      $("cmpCashySub").textContent = `Score ${Number(S.cashy.score).toFixed(1)} · ${S.cashy.category}`;
-      $("cmpRef").textContent = S.reference.label;
-      $("cmpRefSub").textContent = `${S.reference.elegibilidad} · Scorecard ${S.reference.final_score.toFixed(1)} · ${S.reference.band}`;
-      const r = S.record;
-      $("cmpFinal").textContent = `Your final decision after step 2: ${r.final_decision}` +
-        (S.ec.EC2 === "Agree" ? " (you agreed with Cashy)." : S.ec.EC4 === "Yes" ? " (you overrode Cashy)." : " (you disagreed but kept Cashy's recommendation).");
-    }
-    document.querySelectorAll("#secondSeg button").forEach((b) => b.setAttribute("aria-pressed", String(S.second === b.dataset.v)));
-    $("reasonWrap").hidden = S.second !== "Override";
-    const last = S.idx + 1 >= S.total;
-    $("nextBtn").textContent = last ? "Go to post-session →" : "Next household →";
-    $("nextBtn").disabled = !S.second || S.busy;
-    $("nextHint").textContent = last ? "This was the last household. The post-session questionnaire comes next." : `Household ${S.idx + 2} of ${S.total} comes next.`;
+    if ($("rateSolved")) $("rateSolved").hidden = !solved;
 
     // S3
     $("postTitle").textContent = `Session complete · ${S.total} of ${S.total} households reviewed`;
@@ -401,7 +399,7 @@
       Object.assign(S.ec, { EC1: a.EC1, EC2: a.EC2, EC4: a.EC4, EC5: a.EC5, EC6: a.EC6, EC7: a.EC7 }); S.ec3 = a.EC3.slice();
       await submit();
     }
-    S.page = "compare";
+    S.page = "rate";
   }
 
   /* ---------- Wire ---------- */
@@ -409,8 +407,6 @@
   $("decExclude").addEventListener("click", () => run(() => decide("EXCLUDE")));
   $("viewCase").addEventListener("click", () => { log("viewed_case_again"); S.page = "review"; render(); window.scrollTo(0, 0); });
   $("submitBtn").addEventListener("click", () => run(submit));
-  document.querySelectorAll("#secondSeg button").forEach((b) => b.addEventListener("click", () => { S.second = b.dataset.v; log("second_choice", { value: S.second }); render(); }));
-  $("secReason").addEventListener("input", (e) => { S.reason = e.target.value; });
   document.querySelectorAll("[data-tab]").forEach((b) => b.addEventListener("click", () => {
     const tab = b.dataset.tab;
     if (tab === S.tab) return;
@@ -419,7 +415,6 @@
     showTab(tab);
     log("reasoning_tab", { tab });
   }));
-  $("nextBtn").addEventListener("click", () => run(next));
   $("prComment").addEventListener("input", (e) => { S.comment = e.target.value; render(); });
   $("prSubmit").addEventListener("click", () => run(finish));
   $("restart").addEventListener("click", () => { S = fresh(); $("prComment").value = ""; run(() => startSession(PARTICIPANT)); });
@@ -427,7 +422,7 @@
   $("closeLog").addEventListener("click", () => { $("drawer").hidden = true; });
   document.querySelectorAll("[data-jump]").forEach((b) => b.addEventListener("click", () => run(() => jump(b.dataset.jump))));
 
-  $("backBtn").addEventListener("click", () => { S.page = S.submitted ? "compare" : "rate"; render(); window.scrollTo(0, 0); });
+  $("backBtn").addEventListener("click", () => { S.page = "rate"; render(); window.scrollTo(0, 0); });
 
   S = fresh();
   buildItems();
