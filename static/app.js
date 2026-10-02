@@ -391,6 +391,10 @@
       $("breakDone").disabled = !b.over || S.busy;
     }
 
+    const demoWrongCase = !!(S.kase && S.kase.kind === "wrong");
+    $("caseDemoFlag").hidden = !demoWrongCase;
+    $("caseDemoFlagRate").hidden = !demoWrongCase;
+
     // S1
     if (S.kase) {
       const can = !S.decision && !S.busy;
@@ -447,7 +451,6 @@
     const r = S.record;
     const g = gap();
     const metrics = [
-      ["Case kind", r ? r.case_kind + (r.case_kind === "wrong" ? (r.mistake ? " · mistake" : " · caught") : "") : "hidden until submit"],
       ["Reliance outcome", r ? r.outcome.replace(/_/g, " ") : "pending"],
       ["Reasoning–answer gap", g == null ? "–" : (g > 0 ? "+" : "") + g + " (EC6 − EC5)"],
       ["Reasoning tabs read", S.kase ? `${S.viewed.join(" + ")} (first: ${S.firstTab})` : "–"],

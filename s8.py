@@ -177,6 +177,7 @@ def public_case(cfg: dict, rows: list[dict], index: int) -> dict:
     row = rows[cfg["s8_row"]]
     return {
         "case_id": cfg["case_id"], "index": index, "number": index + 1,
+        "kind": cfg.get("kind"),
         "meta": {"office": row["OficinaACNUR"] or NA, "month": row["month"]},
         "household": household(row),
         "admin": admin(row),
