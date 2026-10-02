@@ -115,7 +115,6 @@ def public_case(cfg: dict, rows: list[dict], index: int, total: int) -> dict:
         "factors": [factor(row, f[0]) for f in FACTORS],
         "totals": totals(row),
         "interviewer_view": cfg["interviewer_view"],
-        "transcript": cfg["transcript"],
         "reasoning": {"agree": cfg["reasoning"]["agree"], "disagree": cfg["reasoning"]["disagree"]},
     }
 
@@ -138,9 +137,6 @@ def validate_cases(cases: list[dict], rows: list[dict]) -> None:
             raise ValueError(f"{c['case_id']}: s8_row {c['s8_row']} is out of range")
         if not c.get("interviewer_view"):
             raise ValueError(f"{c['case_id']}: interviewer_view is empty")
-        times = [line["t"] for line in c["transcript"]]
-        if not times or times != sorted(times):
-            raise ValueError(f"{c['case_id']}: transcript must be non-empty and in time order")
         for side in ("agree", "disagree"):
             if not c["reasoning"].get(side):
                 raise ValueError(f"{c['case_id']}: reasoning.{side} is empty")

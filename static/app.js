@@ -7,7 +7,8 @@
   const DEMO = window.CASHY_DEMO || null;
   const params = new URLSearchParams(location.search);
   const RESEARCH = !!DEMO || params.has("research");
-  const DEFAULT_PARTICIPANT = "P-07";
+  // Participant code comes from the link, e.g. /?p=P-07. Without ?p= the session uses P-07.
+  const PARTICIPANT = (params.get("p") || "").trim() || "P-07";
   const $ = (id) => document.getElementById(id);
 
   function h(tag, props, ...kids) {
@@ -22,7 +23,6 @@
     for (const kid of kids.flat()) if (kid != null && kid !== false) n.append(kid.nodeType ? kid : document.createTextNode(String(kid)));
     return n;
   }
-  const fmtSec = (s) => String(Math.floor(s / 60)).padStart(2, "0") + ":" + String(s % 60).padStart(2, "0");
   const fmtMs = (ms) => { const s = Math.floor(ms / 1000); return String(Math.floor(s / 60)).padStart(2, "0") + ":" + String(s % 60).padStart(2, "0"); };
 
   /* ---------- Instruments (Annex II, verbatim) ---------- */
@@ -93,7 +93,7 @@
   /* ---------- State ---------- */
   let S;
   function fresh() {
-    return { page: "start", session: null, participant: null, total: 0, idx: 0, kase: null, events: [], t0: Date.now(),
+    return { page: "review", session: null, participant: null, total: 0, idx: 0, kase: null, events: [], t0: Date.now(),
       tab: "agree", firstTab: "agree", viewed: [], decision: null, cashy: null, ec: {}, ec3: [], submitted: false, reference: null, record: null,
       second: null, reason: "", pr: {}, comment: "", prDone: false, busy: false };
   }
@@ -215,12 +215,6 @@
 
     const viewText = $("viewText");
     if (viewText) viewText.replaceChildren(...k.interviewer_view.map((t) => h("p", { text: t })));
-    const tSearch = $("tSearch");
-    if (tSearch) tSearch.value = "";
-    const tLines = $("tLines");
-    if (tLines) tLines.replaceChildren(...k.transcript.map((L) => h("div", { class: "tline" },
-      h("span", { class: "mono", text: fmtSec(L.t) }),
-      h("span", null, L.who ? h("span", { class: "who", text: L.who + ": " }) : null, L.text))));
     showTab(S.tab);
   }
   function showTab(tab) {
@@ -398,8 +392,7 @@
   /* ---------- Demo jumps (prototype only) ---------- */
   async function jump(target) {
     const auto = () => DEMO.cases[S.idx].autofill;
-    if (target === "start") { S = fresh(); S.page = "review"; await startSession(DEFAULT_PARTICIPANT); return; }
-    if (target === "review" || !S.session) { S = fresh(); await startSession(DEFAULT_PARTICIPANT); if (target === "review") return; }
+    if (target === "review" || !S.session) { S = fresh(); await startSession(PARTICIPANT); if (target === "review") return; }
     if (target === "post") { S.page = "post"; log("demo_jump", { to: "post" }); return; }
     if (S.page === "review" && !S.decision) await decide(auto().decision);
     if (target === "rate") { S.page = "rate"; return; }
@@ -426,16 +419,10 @@
     showTab(tab);
     log("reasoning_tab", { tab });
   }));
-  if ($("tSearch")) {
-    $("tSearch").addEventListener("input", (e) => {
-      const q = e.target.value.trim().toLowerCase();
-      document.querySelectorAll("#tLines .tline").forEach((l) => { l.hidden = !!q && !l.textContent.toLowerCase().includes(q); });
-    });
-  }
   $("nextBtn").addEventListener("click", () => run(next));
   $("prComment").addEventListener("input", (e) => { S.comment = e.target.value; render(); });
   $("prSubmit").addEventListener("click", () => run(finish));
-  $("restart").addEventListener("click", () => { S = fresh(); $("prComment").value = ""; render(); });
+  $("restart").addEventListener("click", () => { S = fresh(); $("prComment").value = ""; run(() => startSession(PARTICIPANT)); });
   $("openLog").addEventListener("click", () => { $("drawer").hidden = false; renderLog(); });
   $("closeLog").addEventListener("click", () => { $("drawer").hidden = true; });
   document.querySelectorAll("[data-jump]").forEach((b) => b.addEventListener("click", () => run(() => jump(b.dataset.jump))));
@@ -443,12 +430,10 @@
   $("backBtn").addEventListener("click", () => { S.page = S.submitted ? "compare" : "rate"; render(); window.scrollTo(0, 0); });
 
   S = fresh();
-  S.page = "review";
   buildItems();
   buildPrinciples();
   $("demoStrip").hidden = !DEMO && !RESEARCH;
   document.querySelector(".demo-tabs").hidden = !DEMO;
   $("openLog").hidden = !RESEARCH;
-  if (DEMO) run(() => startSession(DEFAULT_PARTICIPANT));
-  else run(() => startSession(DEFAULT_PARTICIPANT));
+  run(() => startSession(PARTICIPANT));
 })();

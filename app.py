@@ -32,8 +32,8 @@ VARIANT = os.environ.get("CASHY_VARIANT", "second_look_reasoning_first")
 ROWS = s8.load_rows(S8_PATH)
 
 
-def expand_cases(cases: list[dict], rows: list[dict], target: int = 20) -> list[dict]:
-    """Pad the prototype to a realistic review workload using unique S8 rows from the synthetic dataset."""
+def expand_cases(cases: list[dict], rows: list[dict], target: int = 5) -> list[dict]:
+    """Pad the prototype to the study's five cases per participant using unique S8 rows from the synthetic dataset."""
     if not cases:
         return []
     expanded = list(cases[:target])
@@ -61,7 +61,7 @@ def expand_cases(cases: list[dict], rows: list[dict], target: int = 20) -> list[
     return expanded[:target]
 
 
-CASES = expand_cases(json.loads(CASES_PATH.read_text(encoding="utf-8"))["cases"], ROWS, target=20)
+CASES = expand_cases(json.loads(CASES_PATH.read_text(encoding="utf-8"))["cases"], ROWS, target=5)
 s8.validate_cases(CASES, ROWS)
 
 app = Flask(__name__, static_folder="static", static_url_path="/static")

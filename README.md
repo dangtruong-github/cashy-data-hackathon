@@ -1,8 +1,8 @@
 # Cashy Second Look: caseworker review screen
 
-A review screen for the UNHCR Cashy Oversight Challenge. The caseworker reads the household record, the interviewer's view, the interview transcript and Cashy's reasoning **for both sides** (an *Agree* tab with reasons to include, a *Disagree* tab with reasons to exclude), and makes their own decision. Cashy's recommendation is shown only after that decision is logged. The screen then collects the Annex II items (EC1–EC7), reveals the operation's recorded determination, and ends each session with the five UN AI principle items.
+A review screen for the UNHCR Cashy Oversight Challenge. The caseworker reads the household record and Cashy's reasoning **for both sides** (an *Agree* tab with reasons to include, a *Disagree* tab with reasons to exclude), and makes their own decision. Cashy's recommendation is shown only after that decision is logged. The screen then collects the Annex II items (EC1–EC7) and reveals the operation's recorded determination. This repeats for five households, as in the study. After the fifth household, the caseworker answers the five UN AI principle items once for the whole session.
 
-All data is synthetic. Records come from `S8.synthetic_cashy_sample.csv`. The interviewer's views, transcripts, Cashy's reasoning and Cashy's answers in `cases/cases.json` are written by hand as placeholders for a Cashy-like model. No real household or caseworker appears anywhere.
+All data is synthetic. Records come from `S8.synthetic_cashy_sample.csv`. Cashy's reasoning and Cashy's answers in `cases/cases.json` are written by hand as placeholders for a Cashy-like model. No real household or caseworker appears anywhere.
 
 ## Run
 
@@ -14,25 +14,26 @@ pip install -r requirements.txt
 python app.py
 ```
 
-Open http://127.0.0.1:5000 and enter a participant code such as `P-07`. Add `?research=1` to the URL to show the researcher log drawer.
+Open http://127.0.0.1:5000. The session starts at once with participant code `P-07`. To log a specific caseworker, give them their own link with a `p` parameter, such as http://127.0.0.1:5000/?p=P-12 (2–16 letters, digits, `-` or `_`; never a name). Add `?research=1` (or `&research=1` after `p`) to show the researcher log drawer.
 
 | Variable | Default | Meaning |
 |---|---|---|
 | `CASHY_S8_PATH` | `../S8.synthetic_cashy_sample.csv` | Synthetic Scorecard records |
-| `CASHY_CASES_PATH` | `cases/cases.json` | Cases shown in a session, in order |
+| `CASHY_CASES_PATH` | `cases/cases.json` | Cases shown in a session, in order (padded to five with other S8 rows if the file has fewer) |
 | `CASHY_LOG_DIR` | `logs/` | Where the CSV logs are written |
 | `CASHY_VARIANT` | `second_look_reasoning_first` | Design variant label written to every row |
 | `PORT` | `5000` | Server port |
 
 ## Flow
 
+The session starts as soon as the link opens; the participant code is taken from `?p=`. S1 → S2a → S2b repeats for each of the five households. S3 comes once, after the fifth.
+
 | Page | What happens | What the server releases |
 |---|---|---|
-| S0 Start | Participant enters a pseudonymous code (names are rejected by format) | Session id |
-| S1 Review | Record cards A–D, then three columns: interviewer's view, transcript, and Cashy's reasoning as plain text in two tabs (Agree = include, Disagree = exclude). The tab shown first is random per case. Include / Exclude buttons | Public record only |
+| S1 Review | Record cards A (household), B (Scorecard factors) and D (Scorecard totals), then Cashy's reasoning as plain text in two tabs (Agree = include, Disagree = exclude). The tab shown first is random per case. Include / Exclude buttons | Public record only |
 | S2a Reveal & rate | Cashy's recommendation, score, category and certainty, then EC1–EC7 (EC3 and EC4 only after Disagree) | Cashy's answer, after the decision is logged |
 | S2b Compare | Own decision, Cashy and the operation's recorded determination side by side, then accept or override that determination | Reference determination, after EC items are submitted |
-| S3 Post-session | Five UN AI principle items and a required comment, once per session | – |
+| S3 Post-session | After all five households: five UN AI principle items (1–5) and a required comment, about Cashy as a whole. Once per session | – |
 
 The server enforces this order, so nothing can be fetched early from the browser.
 
@@ -51,7 +52,7 @@ Analyse at the participant level (or with participant-clustered models) and repo
 
 ## Adding cases
 
-Add an entry to `cases/cases.json` with the S8 row (0-based), `interviewer_view` (paragraphs), `transcript` (lines with time in seconds), `reasoning.agree` and `reasoning.disagree` (paragraphs), Cashy's answer, and `demo_autofill` (used only by the offline demo). The app checks references when it starts. Mix concordant and discordant cases, and both error directions, so error direction is not confounded with case.
+Add an entry to `cases/cases.json` with the S8 row (0-based), `interviewer_view` (paragraphs), `reasoning.agree` and `reasoning.disagree` (paragraphs), Cashy's answer, and `demo_autofill` (used only by the offline demo). The app checks references when it starts. Mix concordant and discordant cases, and both error directions, so error direction is not confounded with case.
 
 ## Offline demo
 
