@@ -21,10 +21,28 @@
       <span data-step="1">1 Review</span><i></i><span data-step="2">2 Rate</span>
     </div>
     <span class="chip" id="caseChip">Not started</span>
+    <div class="timer" id="timer" aria-label="Working time">
+      <span class="timer-time mono" id="timerTime" title="Time spent reviewing. Breaks are not counted.">00:00:00</span>
+      <button type="button" class="btn primary sm" id="tStart">Start</button>
+      <button type="button" class="btn ghost sm" id="tPause" hidden>Pause</button>
+      <button type="button" class="btn primary sm" id="tContinue" hidden>Continue</button>
+      <button type="button" class="btn ghost sm" id="tEnd" hidden>End</button>
+    </div>
   </div>
 </header>
 
 <div class="wrap"><div class="error" id="errBox" role="alert" hidden></div></div>
+
+<!-- ============ READY ============ -->
+<main id="pReady" class="wrap content" hidden>
+  <div class="narrow">
+    <section class="card ready">
+      <h2>Ready when you are</h2>
+      <p class="lead">Press <b>Start</b> to open your first household. The clock at the top right counts the time you spend reviewing. Breaks are not counted.</p>
+      <button type="button" class="btn primary wide" id="readyStart">Start</button>
+    </section>
+  </div>
+</main>
 
 <!-- ============ S1 · REVIEW ============ -->
 <main id="pReview" class="wrap content" hidden>
@@ -74,19 +92,19 @@
 <main id="pRate" class="wrap content" hidden>
   <div class="narrow">
     <section class="card">
-      <div class="card-title"><span>Cashy's recommendation</span><span class="chip">Shown after your decision</span></div>
-      <div class="answer">
-        <div class="badge" id="rvBadge">EXCLUDE</div>
-        <dl>
-          <dt>Cashy score</dt><dd class="mono" id="rvScore"></dd>
-          <dt>Category</dt><dd id="rvCat"></dd>
-          <dt>Certainty</dt><dd><span class="certainty" id="rvCertBars" aria-hidden="true"><i></i><i></i><i></i></span><span id="rvCert"></span></dd>
-        </dl>
+      <div class="card-title"><span>Cashy's assessment</span><span class="chip">Shown after your decision</span></div>
+      <div class="split" role="img" id="rvSplit">
+        <div class="split-bar"><i id="rvIncBar"></i></div>
+        <div class="split-labels">
+          <span><b class="mono" id="rvInc"></b> Include</span>
+          <span><b class="mono" id="rvExc"></b> Exclude</span>
+        </div>
       </div>
-      <div class="warn" id="rvWarn">
-        <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5 15 14H1z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M8 6v3.5M8 11.5v.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
-        <span id="rvWarnTxt"></span>
-      </div>
+      <dl class="answer-dl">
+        <dt>Cashy score</dt><dd class="mono" id="rvScore"></dd>
+        <dt>Category</dt><dd id="rvCat"></dd>
+        <dt>Based on</dt><dd id="rvBasis"></dd>
+      </dl>
       <div class="recap-items">
         <span>Your decision: <b id="rcOwn"></b></span>
         <button type="button" class="btn ghost" id="viewCase">View case again ↗</button>
@@ -117,7 +135,7 @@
   <div class="narrow">
     <section class="card">
       <div class="card-title"><span id="postTitle">Session complete</span><span class="chip">Once per session</span></div>
-      <p class="lead">Before you finish, rate Cashy-AI against the five UN principles for the ethical use of AI. There are no right answers. Think about the households you just reviewed.</p>
+      <p class="lead">Before you finish, rate Cashy-AI against the five UN principles for the ethical use of AI. There are no right answers. Think about the households you reviewed in this session.</p>
       <div class="fields"><div class="field"><span class="k">Participant code</span><span class="v mono" id="postCode"></span></div></div>
       <div class="note">Your answers are linked to your assessments by this code. In the original study, forms were matched by a name each participant chose. A code keeps caseworkers from being identifiable.</div>
     </section>
@@ -141,6 +159,33 @@
     </div>
   </div>
 </main>
+
+<!-- ============ PAUSE ============ -->
+<div class="overlay" id="pauseOverlay" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="pauseTitle">
+    <h2 id="pauseTitle">Paused</h2>
+    <p>The clock is stopped. Continue when you're ready, or end your session to go to the final questionnaire.</p>
+    <div class="modal-actions">
+      <button type="button" class="btn ghost" id="pEnd">End session</button>
+      <button type="button" class="btn primary" id="pContinue">Continue</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ BREAK ============ -->
+<div class="overlay" id="breakOverlay" hidden>
+  <div class="modal break" role="dialog" aria-modal="true" aria-labelledby="breakTitle">
+    <button type="button" class="close" id="breakClose" aria-label="Close and keep working" title="Close and keep working">×</button>
+    <div class="break-icon" aria-hidden="true">☕</div>
+    <h2 id="breakTitle"></h2>
+    <p id="breakMsg"></p>
+    <div class="countdown mono" id="breakCount" aria-live="polite"></div>
+    <p class="muted small" id="breakNote"></p>
+    <div class="modal-actions">
+      <button type="button" class="btn primary" id="breakDone" disabled>Back to work</button>
+    </div>
+  </div>
+</div>
 
 <!-- ============ RESEARCHER LOG ============ -->
 <aside class="drawer" id="drawer" hidden aria-label="Researcher log">

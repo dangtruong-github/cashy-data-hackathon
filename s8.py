@@ -2,7 +2,7 @@
 
 Column meanings and value sets follow Annex I (data dictionary) of the challenge brief.
 Outcome columns (Elegibilidad, EligibilityTarget) are never part of the public record:
-they are the reference determination, revealed only after the caseworker submits.
+they are the reference determination, used to score the caseworker's decision.
 """
 from __future__ import annotations
 
@@ -29,6 +29,24 @@ BANDS = {
     "Vulnerabilidad Severa": "Severa (severe)",
 }
 NA = "Not applicable"
+
+# Plain-language reasons per factor: (when above its lowest level, when at its lowest level).
+FACTOR_REASONS = {
+    "Demographics.HH.Head": ("The household head's profile adds vulnerability, for example a lone or female head of household.",
+                             "The household head's profile adds no vulnerability."),
+    "Demographics.Language": ("A language barrier is recorded, which limits access to services and work.",
+                              "No language barrier is recorded."),
+    "Demographics.Profiles": ("Members have specific needs, such as a disability, a chronic illness or a medical condition.",
+                              "No specific needs are recorded for any member."),
+    "Demographics.Documentation": ("Documentation is incomplete, which restricts access to formal work and services.",
+                                   "Identity documents are in order."),
+    "Needs_and_Coping.BasicNeeds": ("Basic needs are reported as unmet.", "Basic needs are reported as met."),
+    "Needs_and_Coping.Housing": ("Housing is unstable.", "Housing is stable."),
+    "Needs_and_Coping.Neg.mechanism": ("The household relies on negative coping strategies.",
+                                       "No negative coping strategies are reported."),
+    "Needs_and_Coping.Dependency": ("Dependants weigh on the household's resources.", "There are few or no dependants."),
+}
+ADMIN_COLS = ("ScoreCOMAR_PIL", "ScoreIntenciones", "ScoreDuplicidad")
 
 
 def load_rows(path: Path) -> list[dict]:
@@ -93,28 +111,77 @@ def admin(row: dict) -> list[dict]:
     return sorted(flags, key=lambda f: f["tone"] != "danger")  # a -500 flag is listed first
 
 
-def totals(row: dict) -> dict:
+def totals(row: dict, band: str | None = None) -> dict:
+    """Card C. `band` overrides the recorded Vulnerability_Category (used by wrong cases)."""
+    category = band or row["Vulnerability_Category"]
     return {
         "demographics": round(_num(row["Demographics_Score"]) or 0, 1),
         "needs": round(_num(row["NeedsandCoping_Score"]) or 0, 1),
         "final": round(_num(row["FinalScore"]) or 0, 1),
         "final_max": 81.1,
         "vulnerability_score": round(_num(row["Vulnerability_Score"]) or 0, 2),
-        "band": BANDS.get(row["Vulnerability_Category"], row["Vulnerability_Category"]),
+        "band": BANDS.get(category, category),
     }
 
 
-def public_case(cfg: dict, rows: list[dict], index: int, total: int) -> dict:
+def has_exclusion_flag(row: dict) -> bool:
+    return any((_num(row[c]) or 0) <= -500 for c in ADMIN_COLS)
+
+
+def wrong_band(row: dict) -> str | None:
+    """A misleading Vulnerability_Category for a wrong case, pointing away from the recorded determination:
+    an included household is shown as Baja, an excluded one as Severa. None if the row cannot be misled."""
+    if has_exclusion_flag(row):
+        return None
+    band = "Vulnerabilidad Baja" if row["EligibilityTarget"] == "INCLUSION" else "Vulnerabilidad Severa"
+    return None if band == row["Vulnerability_Category"] else band
+
+
+def auto_reasoning(row: dict) -> dict:
+    """Reasons to include (agree) and to exclude (disagree), built from the factor levels.
+    Never mentions the band or the score, so a wrong case's band is not contradicted in words."""
+    agree, disagree = [], []
+    for col, *_ in FACTORS:
+        high, low = FACTOR_REASONS[col]
+        if factor(row, col)["level"] > 0:
+            agree.append(high)
+        else:
+            disagree.append(low)
+    for f in admin(row):
+        if f["tone"] == "danger":
+            disagree.insert(0, f"An administrative check excludes this household: {f['label']}.")
+    return {"agree": agree or ["No factor is above its lowest level."],
+            "disagree": disagree or ["Every factor is above its lowest level."]}
+
+
+def cashy_answer(rows: list[dict], i: int, k: int = 30) -> dict:
+    """Cashy's answer without an INCLUDE/EXCLUDE verdict: the score, the band, and how often comparable
+    past households were included. Comparable = same month (funding varies by month) and closest FinalScore."""
+    row = rows[i]
+    score = _num(row["FinalScore"]) or 0
+    same = [j for j in range(len(rows)) if j != i and rows[j]["month"] == row["month"]]
+    near = sorted(same, key=lambda j: abs((_num(rows[j]["FinalScore"]) or 0) - score))[:k]
+    included = sum(rows[j]["EligibilityTarget"] == "INCLUSION" for j in near)
+    pct = round(100 * included / len(near)) if near else 50
+    return {
+        "score": round(score, 1),
+        "category": BANDS.get(row["Vulnerability_Category"], row["Vulnerability_Category"]),
+        "include_pct": pct,
+        "exclude_pct": 100 - pct,
+        "basis": f"Of the {len(near)} past households from the same month with the closest scores, {included} were included.",
+    }
+
+
+def public_case(cfg: dict, rows: list[dict], index: int) -> dict:
     """Everything shown on the review screen. No Cashy answer, no reference determination."""
     row = rows[cfg["s8_row"]]
     return {
-        "case_id": cfg["case_id"], "index": index, "total": total,
+        "case_id": cfg["case_id"], "index": index, "number": index + 1,
         "meta": {"office": row["OficinaACNUR"] or NA, "month": row["month"]},
         "household": household(row),
         "admin": admin(row),
         "factors": [factor(row, f[0]) for f in FACTORS],
-        "totals": totals(row),
-        "interviewer_view": cfg["interviewer_view"],
+        "totals": totals(row, cfg.get("shown_band")),
         "reasoning": {"agree": cfg["reasoning"]["agree"], "disagree": cfg["reasoning"]["disagree"]},
     }
 
@@ -135,10 +202,6 @@ def validate_cases(cases: list[dict], rows: list[dict]) -> None:
     for c in cases:
         if not 0 <= c["s8_row"] < len(rows):
             raise ValueError(f"{c['case_id']}: s8_row {c['s8_row']} is out of range")
-        if not c.get("interviewer_view"):
-            raise ValueError(f"{c['case_id']}: interviewer_view is empty")
         for side in ("agree", "disagree"):
             if not c["reasoning"].get(side):
                 raise ValueError(f"{c['case_id']}: reasoning.{side} is empty")
-        if c["cashy"]["recommendation"] not in ("INCLUDE", "EXCLUDE"):
-            raise ValueError(f"{c['case_id']}: recommendation must be INCLUDE or EXCLUDE")

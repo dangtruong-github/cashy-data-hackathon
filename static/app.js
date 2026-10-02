@@ -1,4 +1,4 @@
-/* Cashy Second Look: review flow.
+/* Cashy: review flow with a work timer and break prompts.
    Server mode talks to the Flask API (app.py). Demo mode (window.CASHY_DEMO set by build_demo.py)
    uses an in-page mock with the same contract, so the single-file prototype behaves the same. */
 (function () {
@@ -23,7 +23,15 @@
     for (const kid of kids.flat()) if (kid != null && kid !== false) n.append(kid.nodeType ? kid : document.createTextNode(String(kid)));
     return n;
   }
-  const fmtMs = (ms) => { const s = Math.floor(ms / 1000); return String(Math.floor(s / 60)).padStart(2, "0") + ":" + String(s % 60).padStart(2, "0"); };
+  const pad = (n) => String(n).padStart(2, "0");
+  const fmtMs = (ms) => { const s = Math.floor(ms / 1000); return pad(Math.floor(s / 60)) + ":" + pad(s % 60); };
+  const fmtClock = (ms) => { const s = Math.floor(ms / 1000); return pad(Math.floor(s / 3600)) + ":" + pad(Math.floor(s / 60) % 60) + ":" + pad(s % 60); };
+  function fmtDuration(ms) {
+    const s = Math.floor(ms / 1000), hrs = Math.floor(s / 3600), min = Math.floor(s / 60) % 60;
+    if (hrs) return `${hrs} hour${hrs > 1 ? "s" : ""}${min ? ` ${min} minute${min > 1 ? "s" : ""}` : ""}`;
+    if (min) return `${min} minute${min > 1 ? "s" : ""}`;
+    return `${s} second${s !== 1 ? "s" : ""}`;
+  }
 
   /* ---------- Instruments (Annex II, verbatim) ---------- */
   const ITEMS = [
@@ -43,6 +51,14 @@
     { id: "accountability", name: "Responsibility and accountability", def: "Guarantee full accountability via oversight, audit or due-diligence mechanisms, and clearly define human responsibility.", q: "Based on the oversight and the clarity of defined human responsibilities, where does Cashy-AI fall on the following accountability scale?", labels: ["Unaccountable", "Weak accountability", "Basic accountability", "Good accountability", "Strong accountability"] }
   ];
 
+  /* Break messages: {t} = time worked, {n} = households reviewed. */
+  const OFFER_MESSAGES = [
+    "You've been working for {t} and reviewed {n}. Great focus! Stand up, stretch your shoulders and grab a glass of water.",
+    "{t} of careful work. Well done! A short walk or a few deep breaths will help you come back sharp.",
+    "You've given {n} your full attention over {t}. Rest your eyes for a moment: look at something far away and roll your neck."
+  ];
+  const FORCE_MESSAGE = "You've been working hard for {t}. Let's take a short pause together. Step away from the screen, stretch, or do a few light exercises. Cashy reopens when the timer ends.";
+
   /* Mirrors protocol.classify() in Python. */
   const opposite = (d) => (d === "INCLUDE" ? "EXCLUDE" : "INCLUDE");
   function classify(own, cashy, ref, ec2, ec4) {
@@ -53,6 +69,21 @@
       : (final === cashy ? "correct_acceptance" : "under_reliance");
     return { relation, final_decision: final, outcome, switched_to_cashy: own !== cashy && final === cashy, end_to_end_correct: final === ref };
   }
+
+  /* Mirrors the case sequence in protocol.py (enter / after_case / after_break). */
+  const PHASE_KIND = { start: "genuine", repeat: "genuine", wrong1: "wrong", after_mistake: "genuine", wrong2: "wrong" };
+  function seqEnter(st, phase, sizes) { st.phase = phase; st.left = sizes[phase] || 1; }
+  function seqAfterCase(st, mistake, sizes) {
+    const p = st.phase;
+    if (p === "wrong1") { seqEnter(st, mistake ? "after_mistake" : "repeat", sizes); return null; }
+    if (p === "wrong2") { if (mistake) return "force"; seqEnter(st, "repeat", sizes); return null; }
+    st.left -= 1;
+    if (st.left > 0) return null;
+    if (p === "after_mistake") return "offer";
+    seqEnter(st, p === "start" ? "repeat" : "wrong1", sizes);
+    return null;
+  }
+  function seqAfterBreak(st, kind, result, sizes) { seqEnter(st, kind === "offer" && result === "completed" ? "wrong2" : "start", sizes); }
 
   /* ---------- API ---------- */
   async function req(method, url, body) {
@@ -66,25 +97,40 @@
     getCase: (i) => req("GET", `/api/session/${S.session}/case/${i}`),
     decide: (i, decision, extra) => req("POST", `/api/session/${S.session}/case/${i}/decision`, Object.assign({ decision }, extra)),
     rate: (i, answers) => req("POST", `/api/session/${S.session}/case/${i}/rate`, answers),
-    second: (i, value, reason) => req("POST", `/api/session/${S.session}/case/${i}/second`, { value, reason }),
+    brk: (result, worked_ms) => req("POST", `/api/session/${S.session}/break`, { result, worked_ms }),
+    end: (worked_ms) => req("POST", `/api/session/${S.session}/end`, { worked_ms }),
     principles: (ratings, comment) => req("POST", `/api/session/${S.session}/principles`, { ratings, comment }),
     log: (i, event, data, ms) => {
       fetch(`/api/session/${S.session}/events`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ case_index: i, event, data, client_ms: ms }), keepalive: true }).catch(() => {});
     }
   };
   function mockApi(D) {
-    const own = {};
+    const sizes = D.config.sizes, seq = {}, served = [], own = {}, next = { genuine: 0, wrong: 0 };
+    let pending = null;
+    seqEnter(seq, "start", sizes);
     return {
-      start: async (p) => ({ session: "demo", participant: p, total: D.cases.length }),
-      getCase: async (i) => D.cases[i].public,
-      decide: async (i, decision) => { own[i] = decision; return { cashy: D.cases[i].hidden.cashy }; },
-      rate: async (i, a) => {
-        const c = D.cases[i].hidden;
-        const cls = classify(own[i], c.cashy.recommendation, c.reference.target, a.EC2, a.EC4);
-        return { reference: c.reference, record: Object.assign(cls, { gap_ec6_minus_ec5: a.EC6 - a.EC5 }) };
+      start: async (p) => ({ session: "demo", participant: p }),
+      getCase: async (i) => {
+        if (i < served.length) return served[i].public;
+        if (pending) throw new Error("Your break is not over yet.");
+        const kind = PHASE_KIND[seq.phase], pool = D[kind];
+        const c = pool[next[kind]++ % pool.length];
+        served.push({ kind, hidden: c.hidden, autofill: c.autofill, public: Object.assign({}, c.public, { index: i, number: i + 1 }) });
+        return served[i].public;
       },
-      second: async () => ({ ok: true }),
+      decide: async (i, decision) => { own[i] = decision; return { cashy: served[i].hidden.cashy }; },
+      rate: async (i, a) => {
+        const c = served[i], ref = c.hidden.reference, lean = c.hidden.cashy.include_pct >= 50 ? "INCLUDE" : "EXCLUDE";
+        const mistake = c.kind === "wrong" && own[i] !== ref.target;
+        const due = seqAfterCase(seq, mistake, sizes);
+        pending = due ? { kind: due, seconds: D.config.break_seconds[due] } : null;
+        const record = Object.assign(classify(own[i], lean, ref.target, a.EC2, a.EC4), { gap_ec6_minus_ec5: a.EC6 - a.EC5, case_kind: c.kind, mistake });
+        return { reference: ref, record, break: pending };
+      },
+      brk: async (result) => { seqAfterBreak(seq, pending.kind, result, sizes); pending = null; return { ok: true }; },
+      end: async () => ({ ok: true, cases_reviewed: served.length }),
       principles: async () => ({ ok: true }),
+      autofill: (i) => served[i] && served[i].autofill,
       log: () => {}
     };
   }
@@ -93,15 +139,15 @@
   /* ---------- State ---------- */
   let S;
   function fresh() {
-    return { page: "review", session: null, participant: null, total: 0, idx: 0, kase: null, events: [], t0: Date.now(),
+    return { page: "ready", session: null, participant: null, idx: 0, kase: null, events: [], t0: Date.now(),
       tab: "agree", firstTab: "agree", viewed: [], decision: null, cashy: null, ec: {}, ec3: [], submitted: false, solved: false, reference: null, record: null,
-      second: null, reason: "", pr: {}, comment: "", prDone: false, busy: false, transitionTimer: null, toastTimer: null };
+      pr: {}, comment: "", prDone: false, busy: false, done: 0,
+      started: false, paused: false, ended: false, accMs: 0, runSince: null, brk: null };
   }
   function resetCase() {
     const first = Math.random() < 0.5 ? "agree" : "disagree"; // counterbalance which side is read first
     Object.assign(S, { kase: null, tab: first, firstTab: first, viewed: [first], decision: null, cashy: null, ec: {}, ec3: [], submitted: false,
-      solved: false, reference: null, record: null, second: null, reason: "", t0: Date.now() });
-    if ($("secReason")) $("secReason").value = "";
+      solved: false, reference: null, record: null, t0: Date.now() });
   }
   function log(event, data) {
     const ms = Date.now() - S.t0;
@@ -117,6 +163,12 @@
     finally { S.busy = false; render(); }
   }
 
+  /* ---------- Work clock: counts only while working, never during a pause or a break ---------- */
+  const worked = () => S.accMs + (S.runSince ? Date.now() - S.runSince : 0);
+  function clockOn() { if (!S.runSince) S.runSince = Date.now(); }
+  function clockOff() { if (S.runSince) { S.accMs += Date.now() - S.runSince; S.runSince = null; } }
+  setInterval(() => { if (S) $("timerTime").textContent = fmtClock(worked()); }, 250);
+
   /* ---------- Derived ---------- */
   const isDisagree = () => S.ec.EC2 === "Disagree";
   function canSubmit() {
@@ -128,13 +180,23 @@
   /* ---------- Flow ---------- */
   async function startSession(code) {
     const r = await api.start(code);
-    Object.assign(S, { session: r.session, participant: r.participant, total: r.total, events: [] });
+    Object.assign(S, { session: r.session, participant: r.participant, events: [], page: "ready" });
+  }
+  async function startWork() {
+    S.started = true; clockOn();
+    log("work_started");
     await loadCase(0);
   }
+  function pause() { clockOff(); S.paused = true; log("work_paused", { worked_ms: worked() }); }
+  function resume() { S.paused = false; clockOn(); log("work_resumed"); }
+  async function endSession() {
+    clockOff();
+    const r = await api.end(worked());
+    Object.assign(S, { paused: false, ended: true, page: "post", done: r.cases_reviewed ?? S.done });
+    log("session_ended", { worked_ms: worked(), cases: S.done });
+    window.scrollTo(0, 0);
+  }
   async function loadCase(i) {
-    if (S.transitionTimer) clearTimeout(S.transitionTimer);
-    if (S.toastTimer) clearTimeout(S.toastTimer);
-    S.toastTimer = null;
     resetCase();
     S.idx = i;
     S.kase = await api.getCase(i);
@@ -147,39 +209,50 @@
     const r = await api.decide(S.idx, decision, { first_tab: S.firstTab, tabs_viewed: S.viewed });
     S.decision = decision; S.cashy = r.cashy;
     log("decision", { decision });
-    log("cashy_revealed", { recommendation: r.cashy.recommendation });
+    log("cashy_revealed", { include_pct: r.cashy.include_pct });
     S.page = "rate";
     window.scrollTo(0, 0);
   }
   async function submit() {
     const a = { EC1: S.ec.EC1, EC2: S.ec.EC2, EC3: isDisagree() ? S.ec3 : [], EC4: isDisagree() ? S.ec.EC4 : null, EC5: S.ec.EC5, EC6: S.ec.EC6, EC7: S.ec.EC7 };
     const r = await api.rate(S.idx, a);
-    S.reference = r.reference; S.record = r.record; S.submitted = true; S.solved = true;
+    S.reference = r.reference; S.record = r.record; S.submitted = true; S.solved = true; S.done += 1;
     log("submitted", { gap: r.record.gap_ec6_minus_ec5, outcome: r.record.outcome });
-    render();
-    window.scrollTo(0, 0);
-
-    if (S.toastTimer) clearTimeout(S.toastTimer);
-    if (S.transitionTimer) clearTimeout(S.transitionTimer);
-    S.toastTimer = null;
-    S.transitionTimer = null;
-
-    if (S.idx + 1 < S.total) {
-      await loadCase(S.idx + 1);
-    } else {
-      S.page = "post";
-      log("post_session_opened");
-      window.scrollTo(0, 0);
-    }
-  }
-  async function next() {
-    if (S.idx + 1 < S.total) await loadCase(S.idx + 1);
-    else { S.page = "post"; log("post_session_opened"); window.scrollTo(0, 0); }
+    if (r.break) openBreak(r.break);
+    else await loadCase(S.idx + 1);
   }
   async function finish() {
     await api.principles(S.pr, S.comment.trim());
     S.prDone = true;
     log("principles_submitted", { ratings: S.pr, comment_chars: S.comment.trim().length });
+  }
+
+  /* ---------- Breaks ---------- */
+  let breakTick = null;
+  function openBreak(b) {
+    clockOff();
+    const t = fmtDuration(worked()), n = S.done;
+    const msg = b.kind === "force" ? FORCE_MESSAGE : OFFER_MESSAGES[Math.floor(Math.random() * OFFER_MESSAGES.length)];
+    S.brk = { kind: b.kind, seconds: b.seconds, endsAt: Date.now() + b.seconds * 1000, over: false,
+      title: b.kind === "force" ? "Time for a short break" : "You've earned a break",
+      msg: msg.replace("{t}", t).replace("{n}", `${n} household${n !== 1 ? "s" : ""}`) };
+    log("break_opened", { kind: b.kind, seconds: b.seconds, worked_ms: worked() });
+    $("breakCount").textContent = fmtMs(b.seconds * 1000);
+    clearInterval(breakTick);
+    breakTick = setInterval(() => {
+      if (!S.brk) return clearInterval(breakTick);
+      const left = Math.max(0, S.brk.endsAt - Date.now());
+      if (!left && !S.brk.over) { S.brk.over = true; clearInterval(breakTick); log("break_finished", { kind: S.brk.kind }); render(); }
+      $("breakCount").textContent = fmtMs(left + 999);
+    }, 200);
+  }
+  async function closeBreak(result) {
+    await api.brk(result, worked());
+    log(result === "completed" ? "break_completed" : "break_skipped", { kind: S.brk.kind });
+    clearInterval(breakTick);
+    S.brk = null;
+    clockOn();
+    await loadCase(S.idx + 1);
   }
 
   /* ---------- Build: case ---------- */
@@ -190,12 +263,6 @@
       cardA.replaceChildren(...k.household.map((f) =>
         h("div", { class: "field" }, h("span", { class: "k", text: f.label }),
           h("span", { class: "v" + (f.na ? " na" : "") }, f.value, f.note ? h("small", null, " " + f.note) : null))));
-    }
-
-    const cardC = $("cardC");
-    if (cardC && Array.isArray(k.admin)) {
-      cardC.replaceChildren(...k.admin.map((f) =>
-        h("div", { class: "flag" }, h("span", { text: f.label }), h("span", { class: "chip " + f.tone, text: f.chip }))));
     }
 
     const factorRow = (f) => h("div", { class: "factor" },
@@ -226,9 +293,6 @@
           h("div", { class: "field" }, h("span", { class: "k" }, "Vulnerability_Score ", h("small", { class: "muted", text: "(index)" })), h("span", { class: "v mono", text: t.vulnerability_score.toFixed(2) })),
           h("div", { class: "field" }, h("span", { class: "k", text: "Band" }), h("span", { class: "v" }, h("span", { class: "chip primary", text: t.band })))));
     }
-
-    const viewText = $("viewText");
-    if (viewText) viewText.replaceChildren(...k.interviewer_view.map((t) => h("p", { text: t })));
     showTab(S.tab);
   }
   function showTab(tab) {
@@ -256,7 +320,6 @@
       } else if (it.kind === "seg") {
         wrap.append(h("div", { class: "seg" }, it.opts.map((o, i) => h("button", { type: "button", "data-item": it.id, "data-v": o, "aria-pressed": "false",
           onclick: () => { S.ec[it.id] = o; log("item_answered", { item: it.id, value: o }); render(); } }, (it.labels || it.opts)[i]))));
-        if (it.id === "EC4") wrap.append(h("span", { class: "prefill", id: "ec4hint" }));
       } else {
         wrap.append(h("div", { class: "checklist" }, it.opts.map((o, i) => h("label", null,
           h("input", { type: "checkbox", id: "ec3-" + i, value: o, onchange: () => {
@@ -278,14 +341,14 @@
   }
 
   /* ---------- Render ---------- */
-  const PAGES = { review: "pReview", rate: "pRate", post: "pPost" };
+  const PAGES = { ready: "pReady", review: "pReview", rate: "pRate", post: "pPost" };
   function render() {
     const p = S.page;
     for (const [k, id] of Object.entries(PAGES)) $(id).hidden = p !== k;
     document.querySelectorAll("[data-jump]").forEach((b) => b.setAttribute("aria-current", String(b.dataset.jump === p)));
 
     // Top bar
-    const step = { review: 1, rate: 2, post: 2 }[p] || 0;
+    const step = { review: 1, rate: 2 }[p] || 0;
     $("stepper").hidden = step === 0;
     document.querySelectorAll("#stepper span").forEach((s) => {
       const n = +s.dataset.step;
@@ -293,16 +356,40 @@
       s.textContent = (n < step ? "✓ " : n + " ") + ["Review", "Rate"][n - 1];
     });
     const meta = $("meta");
-    if (S.kase && step >= 1 && step <= 3) {
+    if (S.kase && step >= 1) {
       meta.replaceChildren(
         h("span", null, "Case ", h("b", { text: S.kase.case_id })),
         h("span", null, "Office ", h("b", { text: S.kase.meta.office })),
         h("span", null, "Interview ", h("b", { text: S.kase.meta.month }))
       );
     } else meta.replaceChildren(h("span", { text: p === "post" ? "Post-session questionnaire" : "Review session" }));
-    $("caseChip").textContent = S.participant
-      ? (p === "post" ? "Session complete" : `Case ${S.idx + 1} / ${S.total}`)
-      : "Not started";
+    $("caseChip").textContent = !S.started ? "Not started" : p === "post" ? "Session complete" : `Case ${S.idx + 1}`;
+
+    // Timer
+    const working = S.started && !S.ended;
+    $("timer").classList.toggle("running", !!S.runSince);
+    $("tStart").hidden = S.started;
+    $("tStart").disabled = !S.session || S.busy;
+    $("readyStart").disabled = !S.session || S.busy;
+    $("tPause").hidden = !working || S.paused;
+    $("tPause").disabled = !!S.brk || S.busy;
+    $("tContinue").hidden = !working || !S.paused;
+    $("tEnd").hidden = !working || !S.paused;
+    $("pauseOverlay").hidden = !(working && S.paused);
+
+    // Break
+    $("breakOverlay").hidden = !S.brk;
+    if (S.brk) {
+      const b = S.brk;
+      $("breakTitle").textContent = b.over ? "Welcome back!" : b.title;
+      $("breakMsg").textContent = b.over ? "Your next household is ready whenever you are." : b.msg;
+      $("breakCount").hidden = b.over;
+      $("breakNote").textContent = b.over ? "" : b.kind === "force"
+        ? "Cashy is paused during this break. The clock is stopped."
+        : "The clock is stopped while you rest. Close this window if you'd rather keep working.";
+      $("breakClose").hidden = b.kind === "force" || b.over;
+      $("breakDone").disabled = !b.over || S.busy;
+    }
 
     // S1
     if (S.kase) {
@@ -313,25 +400,20 @@
       $("backBtn").hidden = !S.decision;
       $("decideHint").textContent = S.decision
         ? `Your decision (${S.decision}) is logged and locked. You are viewing the case again.`
-        : "Cashy's recommendation appears after you decide. Your decision is logged first.";
+        : "Cashy's assessment appears after you decide. Your decision is logged first.";
     }
 
     // S2a
     if (S.cashy) {
       const c = S.cashy;
-      $("rvBadge").textContent = c.recommendation;
+      $("rvInc").textContent = c.include_pct + "%";
+      $("rvExc").textContent = c.exclude_pct + "%";
+      $("rvIncBar").style.width = c.include_pct + "%";
+      $("rvSplit").setAttribute("aria-label", `Include ${c.include_pct} percent, exclude ${c.exclude_pct} percent`);
       $("rvScore").textContent = Number(c.score).toFixed(1);
       $("rvCat").textContent = c.category;
-      $("rvCert").textContent = c.certainty_text;
-      document.querySelectorAll("#rvCertBars i").forEach((i, k) => i.classList.toggle("on", k < c.certainty_level));
-      const same = S.decision === c.recommendation;
-      $("rvWarn").classList.toggle("same", same);
-      $("rvWarnTxt").textContent = same
-        ? `You decided ${S.decision}. Cashy also recommends ${c.recommendation}.`
-        : `You decided ${S.decision}. Cashy recommends ${c.recommendation}.`;
+      $("rvBasis").textContent = c.basis;
       $("rcOwn").textContent = S.decision;
-      const hint = $("ec4hint");
-      if (hint) hint.textContent = `Yes means the final decision is ${opposite(c.recommendation)}. No means it is ${c.recommendation}.`;
     }
     document.querySelectorAll("[data-item]").forEach((b) => {
       const v = b.dataset.v, cur = S.ec[b.dataset.item];
@@ -346,8 +428,8 @@
     $("lockChip").textContent = S.submitted ? "Locked" : "7 items · Annex II";
     if ($("rateSolved")) $("rateSolved").hidden = !solved;
 
-    // S3
-    $("postTitle").textContent = `Session complete · ${S.total} of ${S.total} households reviewed`;
+    // Post-session
+    $("postTitle").textContent = `Session complete · ${S.done} household${S.done !== 1 ? "s" : ""} reviewed in ${fmtDuration(worked())}`;
     $("postCode").textContent = S.participant || "–";
     document.querySelectorAll("[data-p]").forEach((b) => { b.setAttribute("aria-pressed", String(S.pr[b.dataset.p] === +b.dataset.v)); b.disabled = S.prDone; });
     $("prComment").disabled = S.prDone;
@@ -365,12 +447,12 @@
     const r = S.record;
     const g = gap();
     const metrics = [
-      ["Case relation", r ? r.relation : "hidden until submit"],
+      ["Case kind", r ? r.case_kind + (r.case_kind === "wrong" ? (r.mistake ? " · mistake" : " · caught") : "") : "hidden until submit"],
       ["Reliance outcome", r ? r.outcome.replace(/_/g, " ") : "pending"],
       ["Reasoning–answer gap", g == null ? "–" : (g > 0 ? "+" : "") + g + " (EC6 − EC5)"],
       ["Reasoning tabs read", S.kase ? `${S.viewed.join(" + ")} (first: ${S.firstTab})` : "–"],
-      ["You → Cashy → final", S.decision ? `${S.decision} → ${S.cashy ? S.cashy.recommendation : "?"} → ${r ? r.final_decision : "?"}` : "–"],
-      ["Switched to Cashy", r ? (r.switched_to_cashy ? "yes" : "no") : "–"]
+      ["You → reference", S.decision ? `${S.decision} → ${S.reference ? S.reference.target : "?"}` : "–"],
+      ["Worked", fmtClock(worked())]
     ];
     $("metrics").replaceChildren(...metrics.map(([k, v]) => h("div", { class: "metric" }, h("div", { class: "mk", text: k }), h("div", { class: "mv", text: v }))));
     const items = S.events.slice().reverse().map((e) => h("li", null, h("span", { class: "mono muted", text: fmtMs(e.ms) }),
@@ -382,27 +464,31 @@
       cashy: S.cashy, reference: S.reference || "withheld until submit",
       EC1: S.ec.EC1 ?? null, EC2: S.ec.EC2 ?? null, EC3: isDisagree() ? S.ec3 : null, EC4: isDisagree() ? (S.ec.EC4 ?? null) : null,
       EC5: S.ec.EC5 ?? null, EC6: S.ec.EC6 ?? null, EC7: S.ec.EC7 ?? null,
-      gap_ec6_minus_ec5: g, result: r, second_decision: S.second,
+      gap_ec6_minus_ec5: g, result: r, worked_ms: worked(),
       post_session: S.prDone ? { ratings: S.pr } : null
     }, null, 2);
   }
 
   /* ---------- Demo jumps (prototype only) ---------- */
   async function jump(target) {
-    const auto = () => DEMO.cases[S.idx].autofill;
-    if (target === "review" || !S.session) { S = fresh(); await startSession(PARTICIPANT); if (target === "review") return; }
-    if (target === "post") { S.page = "post"; log("demo_jump", { to: "post" }); return; }
-    if (S.page === "review" && !S.decision) await decide(auto().decision);
-    if (target === "rate") { S.page = "rate"; return; }
-    if (!S.submitted) {
-      const a = auto().answers;
-      Object.assign(S.ec, { EC1: a.EC1, EC2: a.EC2, EC4: a.EC4, EC5: a.EC5, EC6: a.EC6, EC7: a.EC7 }); S.ec3 = a.EC3.slice();
-      await submit();
+    if (target === "review") { S = fresh(); await startSession(PARTICIPANT); await startWork(); return; }
+    if (!S.started) await startWork();
+    if (target === "rate" && S.page === "review" && !S.decision) {
+      const auto = api.autofill && api.autofill(S.idx);
+      await decide(auto ? auto.decision : "INCLUDE");
     }
-    S.page = "rate";
   }
 
   /* ---------- Wire ---------- */
+  $("tStart").addEventListener("click", () => run(startWork));
+  $("readyStart").addEventListener("click", () => run(startWork));
+  $("tPause").addEventListener("click", () => { pause(); render(); });
+  $("tContinue").addEventListener("click", () => { resume(); render(); });
+  $("pContinue").addEventListener("click", () => { resume(); render(); });
+  $("tEnd").addEventListener("click", () => run(endSession));
+  $("pEnd").addEventListener("click", () => run(endSession));
+  $("breakClose").addEventListener("click", () => run(() => closeBreak("skipped")));
+  $("breakDone").addEventListener("click", () => run(() => closeBreak("completed")));
   $("decInclude").addEventListener("click", () => run(() => decide("INCLUDE")));
   $("decExclude").addEventListener("click", () => run(() => decide("EXCLUDE")));
   $("viewCase").addEventListener("click", () => { log("viewed_case_again"); S.page = "review"; render(); window.scrollTo(0, 0); });

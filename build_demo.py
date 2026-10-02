@@ -17,23 +17,36 @@ import s8
 BASE = Path(__file__).resolve().parent
 OUT = Path(sys.argv[1]) if len(sys.argv) > 1 else BASE.parent / "cashy-review-demo.html"
 
-HEAD = """<title>Cashy Second Look</title>
+HEAD = """<title>Cashy</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
 """
 
 
-def main() -> None:
-    from app import CASES, ROWS  # reuses the app's paths and validation
+POOL = 20  # cases of each kind bundled into the demo; the mock cycles through them
 
-    demo = {"cases": []}
-    for i, cfg in enumerate(CASES):
-        demo["cases"].append({
-            "public": s8.public_case(cfg, ROWS, i, len(CASES)),
-            "hidden": {"cashy": cfg["cashy"], "reference": s8.reference(ROWS[cfg["s8_row"]])},
-            "autofill": cfg["demo_autofill"],
-        })
+
+def main() -> None:
+    import random
+
+    from app import AUTHORED, BREAK_SECONDS, ROWS, SIZES, WRONG_ROWS, cashy, make_case  # reuses the app's paths and validation
+
+    rng = random.Random(7)
+    authored = [c["s8_row"] for c in AUTHORED]
+    genuine = authored + rng.sample([i for i in range(len(ROWS)) if i not in authored], POOL - len(authored))
+    rows = {"genuine": genuine, "wrong": rng.sample(WRONG_ROWS, POOL)}
+
+    demo = {"config": {"sizes": SIZES, "break_seconds": BREAK_SECONDS}, "genuine": [], "wrong": []}
+    autofill = {c["s8_row"]: c.get("demo_autofill") for c in AUTHORED}
+    for kind, indices in rows.items():
+        for row_index in indices:
+            cfg = make_case(row_index, kind)
+            demo[kind].append({
+                "public": s8.public_case(cfg, ROWS, 0),
+                "hidden": {"cashy": cashy(row_index), "reference": s8.reference(ROWS[row_index])},
+                "autofill": autofill.get(row_index),
+            })
     data = json.dumps(demo, ensure_ascii=False).replace("</", "<\\/")
     css = (BASE / "static" / "style.css").read_text(encoding="utf-8")
     js = (BASE / "static" / "app.js").read_text(encoding="utf-8")
@@ -41,7 +54,7 @@ def main() -> None:
     html = (HEAD + "<style>\n" + css + "</style>\n" + body
             + "\n<script>window.CASHY_DEMO = " + data + ";</script>\n<script>\n" + js + "</script>\n")
     OUT.write_text(html, encoding="utf-8")
-    print(f"Wrote {OUT} ({len(html) // 1024} KB, {len(CASES)} cases)")
+    print(f"Wrote {OUT} ({len(html) // 1024} KB, {POOL} genuine + {POOL} wrong cases)")
 
 
 if __name__ == "__main__":
